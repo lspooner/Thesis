@@ -7,7 +7,6 @@
 #include "resize.h"
 
 #define PI 3.1415
-#define HL 3
 
 void enlargementFilter(my_image_comp *in, my_image_comp *out, int halfLength, int scale);
 void reductionFilter(my_image_comp *in, my_image_comp *out, int halfLength, int scale);
