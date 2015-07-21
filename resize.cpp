@@ -7,7 +7,6 @@
 #include "resize.h"
 
 #define PI 3.1415
-#define DIFF_OFFSET 128
 #define HL 3
 
 void enlargementFilter(my_image_comp *in, my_image_comp *out, int halfLength, int scale);
@@ -36,7 +35,7 @@ int enlargeImage(char* inputFile, char* outputFile, int H, int scale){
     for (int n=0; n < num_comps; n++){
         output_comps[n].init(outHeight, outWidth, 0); // Don't need a border for output
     }
-    
+
     // Process the image, all in floating point (easy)
     for (int n=0; n < num_comps; n++){
        input_comps[n].perform_boundary_extension_symmetric();
@@ -76,7 +75,7 @@ int reduceImage(char* inputFile, char* outputFile, int H, int scale){
     for (n=0; n < num_comps; n++){
         output_comps[n].init(outHeight, outWidth, 0); // Don't need a border for output
     }
-    
+
     // Process the image, all in floating point (easy)
     for (n=0; n < num_comps; n++){
        input_comps[n].perform_boundary_extension_symmetric();
@@ -107,12 +106,12 @@ void enlargementFilter(my_image_comp *in, my_image_comp *out, int halfLength, in
     // Check for consistent dimensions
     assert(in->border >= halfLength);
     assert((out->height >= in->height) && (out->width >= in->width));
-   
+
     //make filters
     //int filterLength = 2*halfLength + 1;
     float **filterhandles = new float*[scale];
     float **filter = new float*[scale];
-    
+
     for(int i = 0; i < scale; i++){
         filterhandles[i] = makeSincFilter(halfLength, ((float)i)/scale, 1);
         filter[i] = filterhandles[i]+halfLength;
@@ -120,16 +119,10 @@ void enlargementFilter(my_image_comp *in, my_image_comp *out, int halfLength, in
         printf("i = %d, scale = %d, centre = %f ", i, scale, ((float)-i)/scale);
         printFArray(filterhandles[i], halfLength*2+1);
     }
-    
-    /*float *filterHandle0 = makeSincFilter(halfLength, 0, 1);
-    float *filterHandle1 = makeSincFilter(halfLength, 1.0/3.0, 1);
-    float *filterHandle2 = makeSincFilter(halfLength, -1.0/3.0, 1);
-    float *filter0 = filterHandle0 + halfLength; // move the filter pointer to point to the middle of the filter
-    float *filter1 = filterHandle1 + halfLength;
-    float *filter2 = filterHandle2 + halfLength;*/
+
     int numPixels = (in->height+2*in->border)*out->width;
     float *tempPic = new float[numPixels];
-    float *tempPicBuf = tempPic + out->width*in->border;   
+    float *tempPicBuf = tempPic + out->width*in->border;
 
     //first apply filter to the rows
     for(int r = -halfLength; r < in->height + halfLength; r++){
@@ -182,12 +175,12 @@ void reductionFilter(my_image_comp *in, my_image_comp *out, int halfLength, int 
     assert((out->height <= in->height) && (out->width <= in->width));
    
     //make filters
-    filterhandles = makeSincFilter(halfLength, 0.0, (float)scale);
-    filter = filterhandles[i]+halfLength;
+    float *filterhandle = makeSincFilter(halfLength, 0.0, (float)scale);
+    float *filter = filterhandle+halfLength;
     
     int numPixels = (in->height+2*in->border)*out->width;
     float *tempPic = new float[numPixels];
-    float *tempPicBuf = tempPic + out->width*in->border;   
+    float *tempPicBuf = tempPic + out->width*in->border;
 
     //first apply filter to the rows
     for(int r = -halfLength; r < in->height + halfLength; r++){
@@ -214,8 +207,7 @@ void reductionFilter(my_image_comp *in, my_image_comp *out, int halfLength, int 
     }
 
     delete[] tempPic;
-    delete[] filter;
-    delete[] filterhandles;
+    delete[] filterhandle;
 }
 
 float* makeSincFilter(int halfLength, float centre, float scaling){

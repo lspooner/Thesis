@@ -7,7 +7,6 @@
 /*****************************************************************************/
 
 #include <string.h>
-#include "fixedPoint.h"
 #include "io_bmp.h"
 #include "image_comps.h"
 #include "resize.h"
@@ -31,7 +30,7 @@ int main(int argc, char *argv[]){
 
             sscanf(argv[4], "%d", &H);
             sscanf(argv[5], "%d", &scale);
-            
+
             if(strcmp(argv[1], "-r") == 0){
                 if((err_code = reduceImage(argv[2], argv[3], H, scale))){
                     throw err_code;
@@ -63,7 +62,7 @@ int main(int argc, char *argv[]){
     } else {
         printUsage(argv[0]);
         return EXIT_FAILURE;
-    } 
+    }
 }
 
 void printFloatArray(float *Array, int size){

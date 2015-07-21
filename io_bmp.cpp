@@ -57,7 +57,9 @@ int bmp_in__open(bmp_in *state, const char *fname){
 
     io_byte magic[14];
     bmp_header header;
-    fread(magic,1,14,state->in);
+    if (fread(magic,1,14,state->in) != 14){
+        return(IO_ERR_FILE_TRUNC);
+    }
     if ((magic[0] != 'B') || (magic[1] != 'M')){
         return(IO_ERR_FILE_HEADER);
     }
@@ -128,7 +130,9 @@ int bmp_in__get_line(bmp_in *state, io_byte *line){
     }
     if (state->alignment_bytes > 0){
         io_byte buf[3];
-        fread(buf,1,(size_t) state->alignment_bytes,state->in);
+        if (fread(buf,1,(size_t) state->alignment_bytes,state->in) != (size_t) state->alignment_bytes){
+            return(IO_ERR_FILE_TRUNC);
+        }
     }
     return 0;
 }

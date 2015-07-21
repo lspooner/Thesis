@@ -8,8 +8,11 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 #include "io_bmp.h"
 #include "image_comps.h"
+
+#define DIFF_OFFSET 128
 
 void printUsage(char* fileName);
 int differenceImage(char* inputFile1, char* inputFile2, char* outputFile);
@@ -20,11 +23,11 @@ int differenceImage(char* inputFile1, char* inputFile2, char* outputFile);
 
 int main(int argc, char *argv[]){
 
-    if(argc == 5){
+    if(argc == 4){
         
         int err_code=0;
         try {
-            if((err_code = differenceImage(argv[2], argv[3], argv[4]))){
+            if((err_code = differenceImage(argv[1], argv[2], argv[3]))){
                 throw err_code;
             }
         } catch (int exc) {
