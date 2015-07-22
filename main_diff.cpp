@@ -93,7 +93,7 @@ int differenceImage(char* inputFile1, char* inputFile2, char* outputFile){
                 float diff = in1->buf[r*in1->stride+c] - in2->buf[r*in2->stride+c];
                 ME += diff;
                 MSE += (diff*diff);
-                out->buf[r*out->stride+c] = 0.5*diff+DIFF_OFFSET;
+                out->buf[r*out->stride+c] = 0.5*diff;
             }
         }
     }

@@ -134,7 +134,7 @@ int readBMP(char* fileName, my_image_comp** input_comps, int border, int* num_co
             io_byte *src = line+n; // Points to first sample of component n
             float *dst = (*input_comps)[n].buf + r * (*input_comps)[n].stride;
             for (int c=0; c < width; c++, src+=(*num_comps)){
-                dst[c] = (float) *src; 
+                dst[c] = (((float) *src)-128)/128.0; 
                 // The cast to type "float" is not
                 // strictly required here, since bytes can always be
                 // converted to floats without any loss of information.
@@ -181,12 +181,12 @@ int outputBMP(char* fileName, my_image_comp* out_comps, int num_comps){
 }
 
 io_byte floatToByte(float num){
-    num += 0.5;
-    if(num >= 255){
+    //num += 0.5; //round to nearest int
+    if(num >= 1){
         return 255;
-    } else if(num <= 0){
+    } else if(num <= -1){
         return 0;
     } else {
-        return (io_byte) num;
+        return (io_byte) (num*128+128.5);
     }
 }
