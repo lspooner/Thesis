@@ -32,11 +32,17 @@ int main(int argc, char *argv[]){
                     throw err_code;
                 }
             } else if(strcmp(argv[1], "-a97") == 0){
-                printf("Not implemented yet\n");
+                if((err_code = analysis_9_7(argv[2], argv[3], levels))){
+                    throw err_code;
+                }
             } else if(strcmp(argv[1], "-s53") == 0){
-                printf("Not implemented yet\n");
+                if((err_code = synthesis_5_3(argv[2], argv[3], levels))){
+                    throw err_code;
+                }
             } else if(strcmp(argv[1], "-s97") == 0){
-                printf("Not implemented yet\n");
+                if((err_code = synthesis_9_7(argv[2], argv[3], levels))){
+                    throw err_code;
+                }
             }
 
         } catch (int exc) {
