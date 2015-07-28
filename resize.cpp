@@ -62,7 +62,6 @@ int reduceImage(char* inputFile, char* outputFile, int H, int scale){
     if ((err_code = readBMP(inputFile, &input_comps, H, &num_comps)) != 0){
         return err_code;
     }
-    //printf("read in bmp ok\n");
 
     int width = input_comps[0].width, height = input_comps[0].height;
 
@@ -107,16 +106,12 @@ void enlargementFilter(my_image_comp *in, my_image_comp *out, int halfLength, in
     assert((out->height >= in->height) && (out->width >= in->width));
 
     //make filters
-    //int filterLength = 2*halfLength + 1;
     float **filterhandles = new float*[scale];
     float **filter = new float*[scale];
 
     for(int i = 0; i < scale; i++){
         filterhandles[i] = makeSincFilter(halfLength, ((float)i)/scale, 1);
         filter[i] = filterhandles[i]+halfLength;
-        
-        printf("i = %d, scale = %d, centre = %f ", i, scale, ((float)-i)/scale);
-        printFArray(filterhandles[i], halfLength*2+1);
     }
 
     int numPixels = (in->height+2*in->border)*out->width;
@@ -132,8 +127,6 @@ void enlargementFilter(my_image_comp *in, my_image_comp *out, int halfLength, in
             if(filternum != 0){
                 inputC++;
             }
-            //printf("inputC = %d, filternum = %d\n", inputC, filternum);
-            //printFArray(filter[filternum], halfLength*2+1);
             for(int n = -halfLength; n <= halfLength; n++){
                 sum += filter[filternum][n] * in->buf[r*in->stride+inputC+n];
             }
@@ -150,8 +143,6 @@ void enlargementFilter(my_image_comp *in, my_image_comp *out, int halfLength, in
             if(filternum != 0){
                 inputR++;
             }
-            //printf("inputR = %d, filternum = %d\n", inputR, filternum);
-            //printFArray(filter[filternum], halfLength*2+1);
             for(int n = -halfLength; n <= halfLength; n++){
                 sum += filter[filternum][n] * tempPicBuf[(inputR+n)*out->width+c];
             }
