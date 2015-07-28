@@ -1,22 +1,17 @@
-#include <armadillo>
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
 #include <assert.h>
 #include "image_comps.h"
 #include "io_bmp.h"
-//#include "affine.h"
+#include "affine.h"
 
-//using namespace std;
-//using namespace arma;
+using namespace std;
+using namespace arma;
 
-void resampleImageComponents(my_image_comp *in, my_image_comp *out, arma::Mat<float> transform);
+void resampleImageComponents(my_image_comp *in, my_image_comp *out, Mat<float> transform);
 float bilinear_interpolation_2D(float x, float y, float val_00, float val_01, float val_10, float val_11);
 float bilinear_interpolation_1D(float x, float x0_val, float x1_val);
-
-int main(){
-    return 0;
-}
 
 int resampleImage(char* inputFile, char* outputFile, arma::Mat<float> transform){
 
@@ -61,19 +56,19 @@ int resampleImage(char* inputFile, char* outputFile, arma::Mat<float> transform)
     return 0;
 }
 
-void resampleImageComponents(my_image_comp *in, my_image_comp *out, arma::Mat<float> transform){
+void resampleImageComponents(my_image_comp *in, my_image_comp *out, Mat<float> transform){
     for(int r = 0; r < out->height; r++){
         for(int c = 0; c < out->stride; c++){
-            arma::Mat<float> output(2, 1);
-            output[0] = r;
-            output[1] = c;
-            arma::Mat<float> input = transform*output;
+            Mat<float> output(2, 1);
+            output(0, 0) = r;
+            output(1, 0) = c;
+            Mat<float> input = transform*output;
 
-            float inR = input[0];
-            float inC = input[1];
+            float inR = input(0, 0);
+            float inC = input(1, 0);
 
             if(inC > -1 && inC < out->width && inR > -1 && inR < out->height){
-                out->buf[r*out->stride+c] = bilinear_interpolation_2D(inC, inR, in->buf[((int)inR)*in->stride+((int)inC)], in->buf[((int)inR)*in->stride+((int)inC+1)], in->buf[((int)inR+1)*in->stride+((int)inC)], in->buf[((int)inR+1)*in->stride+((int)inC+1)]);
+                out->buf[r*out->stride+c] = bilinear_interpolation_2D(inC-((int)inC), inR-((int)inR), in->buf[((int)inR)*in->stride+((int)inC)], in->buf[((int)inR)*in->stride+((int)inC+1)], in->buf[((int)inR+1)*in->stride+((int)inC)], in->buf[((int)inR+1)*in->stride+((int)inC+1)]);
             }
         }
     }
