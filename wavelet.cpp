@@ -17,6 +17,7 @@
 #define HL_S97_HP 4
 
 void analysis(my_image_comp *in, my_image_comp *out, int spacing, int offset, float* LPfilter, float* HPfilter, int LP_HL, int HP_HL);
+void synthesis(my_image_comp *in, my_image_comp *out, int spacing, int offset, float* LPfilter, float* HPfilter, int LP_HL, int HP_HL);
 
 int analysis_5_3(char* inputFile, char* outputFile, int levels){
     // Read the input image
@@ -122,7 +123,7 @@ int synthesis_5_3(char* inputFile, char* outputFile, int levels){
     my_image_comp *input_comps = NULL;
     int num_comps;
     int scale = pow(2.0, (float) levels);
-    if ((err_code = readBMP(inputFile, &input_comps, HL_S53_LP*scale+HL_S53_HP, &num_comps)) != 0){
+    if ((err_code = readBMP(inputFile, &input_comps, HL_S53_HP*scale+HL_S53_LP, &num_comps)) != 0){
         return err_code;
     }
 
@@ -151,7 +152,7 @@ int synthesis_5_3(char* inputFile, char* outputFile, int levels){
     for(int n=0; n < num_comps; n++){
         for (int spacing=scale/2; spacing >= 1; spacing/=2){
             //analysis_5_3_single(input_comps+n, output_comps+n, spacing, 0);
-            analysis(input_comps+n, output_comps+n, spacing, 0, LPfilter, HPfilter, HL_S53_LP, HL_S53_HP);
+            synthesis(input_comps+n, output_comps+n, spacing, 0, LPfilter, HPfilter, HL_S53_LP, HL_S53_HP);
         }
     }
 
@@ -171,7 +172,7 @@ int synthesis_9_7(char* inputFile, char* outputFile, int levels){
     my_image_comp *input_comps = NULL;
     int num_comps;
     int scale = pow(2.0, (float) levels);
-    if ((err_code = readBMP(inputFile, &input_comps, HL_S97_LP*scale+HL_S97_HP, &num_comps)) != 0){
+    if ((err_code = readBMP(inputFile, &input_comps, HL_S97_HP*scale+HL_S97_LP, &num_comps)) != 0){
         return err_code;
     }
 
@@ -200,7 +201,7 @@ int synthesis_9_7(char* inputFile, char* outputFile, int levels){
     for(int n=0; n < num_comps; n++){
         for (int spacing=scale/2; spacing >= 1; spacing/=2){
             //analysis_5_3_single(input_comps+n, output_comps+n, spacing, 0);
-            analysis(input_comps+n, output_comps+n, spacing, 0, LPfilter, HPfilter, HL_S97_LP, HL_S97_HP);
+            synthesis(input_comps+n, output_comps+n, spacing, 0, LPfilter, HPfilter, HL_S97_LP, HL_S97_HP);
         }
     }
 
@@ -272,15 +273,89 @@ void analysis(my_image_comp *in, my_image_comp *out, int spacing, int offset, fl
 
 void synthesis(my_image_comp *in, my_image_comp *out, int spacing, int offset, float* LPfilter, float* HPfilter, int LP_HL, int HP_HL){
     // Check for consistent dimensions
-    assert(in->border >= LP_HL*spacing+HP_HL);
+    assert(in->border >= HP_HL*spacing+LP_HL);
     assert((out->height == in->height) && (out->width == in->width));
 
     int numPixels = (in->height+2*in->border)*out->width;
     float *tempPic = new float[numPixels]();
     float *tempPicBuf = tempPic + out->width*in->border;
 
+    for(int i = 0; i < out->stride*(out->height+2*out->border); i++){
+        out->handle[i] = 0;
+    }
+
+    /*printf("\nInput:");
+    for(int r = 0; r < in->height; r++){
+        for(int c = 0; c < in->width; c++){
+            printf("%f ", in->buf[r*in->stride+c]);
+        }
+        printf("\n");
+    }*/
+
     //apply lowpass filter to the rows
-    for(int r = -LP_HL; r < in->height + LP_HL; r++){
+    for(int r = -HP_HL; r < in->height + HP_HL; r++){
+        for(int c = -HP_HL+offset; c < in->stride; c+=2*spacing){
+            for(int n = -LP_HL; n <= LP_HL; n++){
+                if(c+n >= offset && c+n < out->width){
+                    tempPicBuf[r*out->width+c+n] += LPfilter[n] * in->buf[r*in->stride+c];
+                }
+            }
+        }
+    }
+
+    //apply highpass filter to the rows
+    for(int r = -HP_HL; r < in->height + HP_HL; r++){
+        for(int c = -HP_HL+offset+spacing; c < in->stride; c+=2*spacing){
+            for(int n = -HP_HL; n <= HP_HL; n++){
+                if(c+n >= offset && c+n < out->width){
+                    tempPicBuf[r*out->width+c+n] += HPfilter[n] * in->buf[r*in->stride+c];
+                }
+            }
+        }
+    }
+
+    /*printf("\nTemp:");
+    for(int r = 0; r < in->height; r++){
+        for(int c = 0; c < out->width; c++){
+            printf("%f ", tempPicBuf[r*out->width+c]);
+        }
+        printf("\n");
+    }*/
+
+    //apply lowpass filter to the columns
+    //printf("\n");
+    for(int r = offset; r < out->height; r+=2*spacing){
+        for(int c = offset; c < out->width; c++){
+            for(int n = -LP_HL; n <= LP_HL; n++){
+                if(r+n >= offset && r+n < out->height){
+                    //printf("%f\n", out->buf[(r+n)*out->width+c]);
+                    out->buf[(r+n)*out->width+c] += LPfilter[n] * tempPicBuf[r*out->width+c];
+                    //printf("%d, %d, %d, %f, %f, %f, %f\n", r, c, n, LPfilter[n], tempPicBuf[r*out->width+c], LPfilter[n] * tempPicBuf[r*out->width+c], out->buf[(r+n)*out->width+c]);
+                }
+            }
+        }
+    }
+
+    //apply highpass filter to the columns
+    for(int r = offset+spacing; r < out->height; r+=2*spacing){
+        for(int c = offset; c < out->width; c++){
+            for(int n = -HP_HL; n <= HP_HL; n++){
+                if(r+n >= offset && r+n < out->height){
+                    out->buf[(r+n)*out->width+c] += HPfilter[n] * tempPicBuf[r*out->width+c];
+                }
+            }
+        }
+    }
+
+    /*printf("\nOutput:\n");
+    for(int r = 0; r < out->height; r++){
+        for(int c = 0; c < out->width; c++){
+            printf("%f ", out->buf[r*out->stride+c]);
+        }
+        printf("\n");
+    }*/
+
+    /*for(int r = -LP_HL; r < in->height + LP_HL; r++){
         for(int n = -LP_HL; n <= LP_HL; n++){
             for(int c = offset+(spacing*n); c < out->width; c+=2*spacing){
             //TODO: work out how the fuck this indexing works
@@ -325,7 +400,7 @@ void synthesis(my_image_comp *in, my_image_comp *out, int spacing, int offset, f
                 }
             }
         }
-    }
+    }*/
 
     delete[] tempPic;
 }
