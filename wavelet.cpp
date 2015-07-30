@@ -6,16 +6,6 @@
 #include "io_bmp.h"
 #include "wavelet.h"
 
-#define HL_A53_LP 2
-#define HL_A53_HP 1
-#define HL_A97_LP 4
-#define HL_A97_HP 3
-
-#define HL_S53_LP 1
-#define HL_S53_HP 2
-#define HL_S97_LP 3
-#define HL_S97_HP 4
-
 void analysis(my_image_comp *in, my_image_comp *out, int spacing, int offset, float* LPfilter, float* HPfilter, int LP_HL, int HP_HL);
 void synthesis(my_image_comp *in, my_image_comp *out, int spacing, int offset, float* LPfilter, float* HPfilter, int LP_HL, int HP_HL);
 
@@ -45,16 +35,8 @@ int analysis_5_3(char* inputFile, char* outputFile, int levels){
        input_comps[n].perform_boundary_extension_symmetric();
     }
 
-    float LPfilterhandle[5] = {-0.125, 0.25, 0.75, 0.25, -0.125};
-    float HPfilterhandle[3] = {-0.25, 0.5, -0.25};
-
-    float *LPfilter = LPfilterhandle + HL_A53_LP;
-    float *HPfilter = HPfilterhandle + HL_A53_HP;
-
     for(int n=0; n < num_comps; n++){
-        for (int spacing=1; spacing < scale; spacing*=2){
-            analysis(input_comps+n, output_comps+n, spacing, 0, LPfilter, HPfilter, HL_A53_LP, HL_A53_HP);
-        }
+        analysis_5_3(input_comps+n, output_comps+n, levels);
     }
 
     // Write the image back out again
@@ -65,6 +47,19 @@ int analysis_5_3(char* inputFile, char* outputFile, int levels){
     delete[] input_comps;
     delete[] output_comps;
     return 0;
+}
+
+void analysis_5_3(my_image_comp *in, my_image_comp *out, int levels){
+    float LPfilterhandle[5] = {-0.125, 0.25, 0.75, 0.25, -0.125};
+    float HPfilterhandle[3] = {-0.25, 0.5, -0.25};
+
+    float *LPfilter = LPfilterhandle + HL_A53_LP;
+    float *HPfilter = HPfilterhandle + HL_A53_HP;
+
+    int scale = pow(2.0, (float) levels);
+    for (int spacing=1; spacing < scale; spacing*=2){
+        analysis(in, out, spacing, 0, LPfilter, HPfilter, HL_A53_LP, HL_A53_HP);
+    }
 }
 
 int analysis_9_7(char* inputFile, char* outputFile, int levels){
@@ -93,16 +88,8 @@ int analysis_9_7(char* inputFile, char* outputFile, int levels){
        input_comps[n].perform_boundary_extension_symmetric();
     }
 
-    float LPfilterhandle[9] = {0.026749, -0.016864, -0.078223, 0.266864, 0.602949, 0.266864, -0.078223, -0.016864, 0.026749};
-    float HPfilterhandle[7] = {0.045636, -0.028772, -0.295636, 0.557543, -0.295636, -0.028772, 0.045636};
-
-    float *LPfilter = LPfilterhandle + HL_A97_LP;
-    float *HPfilter = HPfilterhandle + HL_A97_HP;
-
     for(int n=0; n < num_comps; n++){
-        for (int spacing=1; spacing < scale; spacing*=2){
-            analysis(input_comps+n, output_comps+n, spacing, 0, LPfilter, HPfilter, HL_A97_LP, HL_A97_HP);
-        }
+        analysis_9_7(input_comps+n, output_comps+n, levels);
     }
 
     // Write the image back out again
@@ -113,6 +100,19 @@ int analysis_9_7(char* inputFile, char* outputFile, int levels){
     delete[] input_comps;
     delete[] output_comps;
     return 0;
+}
+
+void analysis_9_7(my_image_comp *in, my_image_comp *out, int levels){
+    float LPfilterhandle[9] = {0.026749, -0.016864, -0.078223, 0.266864, 0.602949, 0.266864, -0.078223, -0.016864, 0.026749};
+    float HPfilterhandle[7] = {0.045636, -0.028772, -0.295636, 0.557543, -0.295636, -0.028772, 0.045636};
+
+    float *LPfilter = LPfilterhandle + HL_A97_LP;
+    float *HPfilter = HPfilterhandle + HL_A97_HP;
+
+    int scale = pow(2.0, (float) levels);
+    for (int spacing=1; spacing < scale; spacing*=2){
+        analysis(in, out, spacing, 0, LPfilter, HPfilter, HL_A97_LP, HL_A97_HP);
+    }
 }
 
 int synthesis_5_3(char* inputFile, char* outputFile, int levels){
@@ -141,16 +141,8 @@ int synthesis_5_3(char* inputFile, char* outputFile, int levels){
        input_comps[n].perform_boundary_extension_symmetric();
     }
 
-    float LPfilterhandle[3] = {2*0.25, 2*0.5, 2*0.25};
-    float HPfilterhandle[5] = {-2*0.125, -2*0.25, 2*0.75, -2*0.25, -2*0.125};
-
-    float *LPfilter = LPfilterhandle + HL_S53_LP;
-    float *HPfilter = HPfilterhandle + HL_S53_HP;
-
     for(int n=0; n < num_comps; n++){
-        for (int spacing=scale/2; spacing >= 1; spacing/=2){
-            synthesis(input_comps+n, output_comps+n, spacing, 0, LPfilter, HPfilter, HL_S53_LP, HL_S53_HP);
-        }
+        synthesis_5_3(input_comps+n, output_comps+n, levels);
     }
 
     // Write the image back out again
@@ -161,6 +153,19 @@ int synthesis_5_3(char* inputFile, char* outputFile, int levels){
     delete[] input_comps;
     delete[] output_comps;
     return 0;
+}
+
+void synthesis_5_3(my_image_comp *in, my_image_comp *out, int levels){
+    float LPfilterhandle[3] = {2*0.25, 2*0.5, 2*0.25};
+    float HPfilterhandle[5] = {-2*0.125, -2*0.25, 2*0.75, -2*0.25, -2*0.125};
+
+    float *LPfilter = LPfilterhandle + HL_S53_LP;
+    float *HPfilter = HPfilterhandle + HL_S53_HP;
+
+    int scale = pow(2.0, (float) levels);
+    for (int spacing=scale/2; spacing >= 1; spacing/=2){
+        synthesis(in, out, spacing, 0, LPfilter, HPfilter, HL_S53_LP, HL_S53_HP);
+    }
 }
 
 int synthesis_9_7(char* inputFile, char* outputFile, int levels){
@@ -189,16 +194,8 @@ int synthesis_9_7(char* inputFile, char* outputFile, int levels){
        input_comps[n].perform_boundary_extension_symmetric();
     }
 
-    float LPfilterhandle[7] = {-2*0.045636, -2*0.028772, 2*0.295636, 2*0.557543, 2*0.295636, -2*0.028772, -2*0.045636};
-    float HPfilterhandle[9] = {2*0.026749, 2*0.016864, -2*0.078223, -2*0.266864, 2*0.602949, -2*0.266864, -2*0.078223, 2*0.016864, 2*0.026749};
-
-    float *LPfilter = LPfilterhandle + HL_S97_LP;
-    float *HPfilter = HPfilterhandle + HL_S97_HP;
-
     for(int n=0; n < num_comps; n++){
-        for (int spacing=scale/2; spacing >= 1; spacing/=2){
-            synthesis(input_comps+n, output_comps+n, spacing, 0, LPfilter, HPfilter, HL_S97_LP, HL_S97_HP);
-        }
+        synthesis_9_7(input_comps+n, output_comps+n, levels);
     }
 
     // Write the image back out again
@@ -209,6 +206,19 @@ int synthesis_9_7(char* inputFile, char* outputFile, int levels){
     delete[] input_comps;
     delete[] output_comps;
     return 0;
+}
+
+void synthesis_9_7(my_image_comp *in, my_image_comp *out, int levels){
+    float LPfilterhandle[7] = {-2*0.045636, -2*0.028772, 2*0.295636, 2*0.557543, 2*0.295636, -2*0.028772, -2*0.045636};
+    float HPfilterhandle[9] = {2*0.026749, 2*0.016864, -2*0.078223, -2*0.266864, 2*0.602949, -2*0.266864, -2*0.078223, 2*0.016864, 2*0.026749};
+
+    float *LPfilter = LPfilterhandle + HL_S97_LP;
+    float *HPfilter = HPfilterhandle + HL_S97_HP;
+
+    int scale = pow(2.0, (float) levels);
+    for (int spacing=scale/2; spacing >= 1; spacing/=2){
+        synthesis(in, out, spacing, 0, LPfilter, HPfilter, HL_S97_LP, HL_S97_HP);
+    }
 }
 
 void analysis(my_image_comp *in, my_image_comp *out, int spacing, int offset, float* LPfilter, float* HPfilter, int LP_HL, int HP_HL){
@@ -325,4 +335,56 @@ void synthesis(my_image_comp *in, my_image_comp *out, int spacing, int offset, f
     }
 
     delete[] tempPic;
+}
+
+int increaseWaveletLevel(char* inputFile, char* outputFile, int levels){
+    // Read the input image
+    int err_code;
+    my_image_comp *input_comps = NULL;
+    int num_comps;
+    int scale = pow(2.0, (float) levels);
+    if ((err_code = readBMP(inputFile, &input_comps, 0, &num_comps)) != 0){
+        return err_code;
+    }
+
+    int width = input_comps[0].width, height = input_comps[0].height;
+
+    // Allocate storage for the filtered output
+
+    int outHeight = height*scale;
+    int outWidth = width*scale;
+    my_image_comp *output_comps = new my_image_comp[num_comps];
+    for (int n=0; n < num_comps; n++){
+        output_comps[n].init(outHeight, outWidth, 0); // Don't need a border for output
+    }
+
+    for(int n=0; n < num_comps; n++){
+        increaseWaveletLevel(input_comps+n, output_comps+n, scale);
+    }
+
+    // Write the image back out again
+    if((err_code = outputBMP(outputFile, output_comps, num_comps)) != 0){
+        return err_code;
+    }
+
+    delete[] input_comps;
+    delete[] output_comps;
+    return 0;
+}
+
+void increaseWaveletLevel(my_image_comp *in, my_image_comp *out, int scale){
+    assert(out->height == in->height*scale);
+    assert(out->width == in->width*scale);
+
+    for(int r = 0; r < out->height; r++){
+        for(int c = 0; c < out->width; c++){
+            out->buf[r*out->stride+c] = 0;
+        }
+    }
+
+    for(int r = 0; r < out->height; r+=scale){
+        for(int c = 0; c < out->width; c+=scale){
+            out->buf[r*out->stride+c] = in->buf[(r/scale)*in->stride+(c/scale)];
+        }
+    }
 }

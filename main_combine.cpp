@@ -9,7 +9,7 @@
 #include <string.h>
 #include "io_bmp.h"
 #include "image_comps.h"
-#include "wavelet.h"
+#include "combine.h"
 
 void printUsage(char* fileName);
 
@@ -19,32 +19,32 @@ void printUsage(char* fileName);
 
 int main(int argc, char *argv[]){
 
-    if(argc == 5 && (strcmp(argv[1], "-a53") == 0 || strcmp(argv[1], "-a97")==0 || strcmp(argv[1], "-s53")==0 || strcmp(argv[1], "-s97")==0 || strcmp(argv[1], "-i")==0)){
+    if((argc == 7 && strcmp(argv[1], "-ci") == 0) || (argc == 9 && strcmp(argv[1], "-cw")==0)){
         
         int err_code=0;
         try {
-            int levels;
+            if(argc == 7){
+                int waveletType;
+                int combineType;
 
-            sscanf(argv[4], "%d", &levels);
+                sscanf(argv[5], "%d", &waveletType);
+                sscanf(argv[6], "%d", &combineType);
 
-            if(strcmp(argv[1], "-a53") == 0){
-                if((err_code = analysis_5_3(argv[2], argv[3], levels))){
+                if((err_code = combineImages(argv[2], argv[3], argv[4], waveletType, combineType))){
                     throw err_code;
                 }
-            } else if(strcmp(argv[1], "-a97") == 0){
-                if((err_code = analysis_9_7(argv[2], argv[3], levels))){
-                    throw err_code;
-                }
-            } else if(strcmp(argv[1], "-s53") == 0){
-                if((err_code = synthesis_5_3(argv[2], argv[3], levels))){
-                    throw err_code;
-                }
-            } else if(strcmp(argv[1], "-s97") == 0){
-                if((err_code = synthesis_9_7(argv[2], argv[3], levels))){
-                    throw err_code;
-                }
-            } else if(strcmp(argv[1], "-i")==0){
-                if((err_code = increaseWaveletLevel(argv[2], argv[3], levels))){
+            } else {
+                int LRspacing;
+                int method;
+                int Roffset;
+                int Coffset;
+
+                sscanf(argv[5], "%d", &LRspacing);
+                sscanf(argv[6], "%d", &method);
+                sscanf(argv[7], "%d", &Roffset);
+                sscanf(argv[8], "%d", &Coffset);
+
+                if((err_code = combineWavelets(argv[2], argv[3], argv[4], LRspacing, method, Roffset, Coffset))){
                     throw err_code;
                 }
             }
@@ -74,9 +74,9 @@ int main(int argc, char *argv[]){
 }
 
 void printUsage(char* fileName){
-    fprintf(stderr, "Usage: %s -a53 <in bmp file> <out bmp file> <levels>\n"
-        "       %s -a97 <in bmp file> <out bmp file> <levels>\n"
-        "       %s -s53 <in bmp file> <out bmp file> <levels>\n"
-        "       %s -s97 <in bmp file> <out bmp file> <levels>\n"
-        "       %s -i   <in bmp file> <out bmp file> <levels>\n", fileName, fileName, fileName, fileName, fileName);
+    fprintf(stderr, "Usage: %s -ci <in LR bmp file> <in HR bmp file> <out bmp file> waveletType combineType\n"
+                    "       %s -cw <in LR bmp file> <in HR bmp file> <out bmp file> LRspacing combineType Roffset Coffset"
+                    "\n"
+                    "waveletType: 0 = CDF5/3, 1 = CDF9/7\n"
+                    "combineType: 0 = max coefficient\n", fileName, fileName);
 }
