@@ -9,6 +9,8 @@
 void analysis(my_image_comp *in, my_image_comp *out, int spacing, int offset, float* LPfilter, float* HPfilter, int LP_HL, int HP_HL);
 void synthesis(my_image_comp *in, my_image_comp *out, int spacing, int offset, float* LPfilter, float* HPfilter, int LP_HL, int HP_HL);
 
+void copyBuffer(my_image_comp *copyFrom, my_image_comp *copyTo);
+
 int analysis_5_3(char* inputFile, char* outputFile, int levels){
     // Read the input image
     int err_code;
@@ -59,6 +61,10 @@ void analysis_5_3(my_image_comp *in, my_image_comp *out, int levels){
     int scale = pow(2.0, (float) levels);
     for (int spacing=1; spacing < scale; spacing*=2){
         analysis(in, out, spacing, 0, LPfilter, HPfilter, HL_A53_LP, HL_A53_HP);
+        if(spacing < scale/2){
+            copyBuffer(out, in);
+            in->perform_boundary_extension_symmetric();
+        }
     }
 }
 
@@ -112,6 +118,10 @@ void analysis_9_7(my_image_comp *in, my_image_comp *out, int levels){
     int scale = pow(2.0, (float) levels);
     for (int spacing=1; spacing < scale; spacing*=2){
         analysis(in, out, spacing, 0, LPfilter, HPfilter, HL_A97_LP, HL_A97_HP);
+        if(spacing < scale/2){
+            copyBuffer(out, in);
+            in->perform_boundary_extension_symmetric();
+        }
     }
 }
 
@@ -163,8 +173,14 @@ void synthesis_5_3(my_image_comp *in, my_image_comp *out, int levels){
     float *HPfilter = HPfilterhandle + HL_S53_HP;
 
     int scale = pow(2.0, (float) levels);
-    for (int spacing=scale/2; spacing >= 1; spacing/=2){
+    for (int spacing=scale/2; spacing >= scale/2; spacing/=2){
+        printf("synthesis: scale = %d, spacing = %d\n", scale, spacing);
         synthesis(in, out, spacing, 0, LPfilter, HPfilter, HL_S53_LP, HL_S53_HP);
+        /*if(spacing > 1){
+            printf("performing boundary extension\n");
+            copyBuffer(out, in);
+            in->perform_boundary_extension_symmetric();
+        }*/
     }
 }
 
@@ -218,6 +234,10 @@ void synthesis_9_7(my_image_comp *in, my_image_comp *out, int levels){
     int scale = pow(2.0, (float) levels);
     for (int spacing=scale/2; spacing >= 1; spacing/=2){
         synthesis(in, out, spacing, 0, LPfilter, HPfilter, HL_S97_LP, HL_S97_HP);
+        if(spacing > 1){
+            copyBuffer(out, in);
+            in->perform_boundary_extension_symmetric();
+        }
     }
 }
 
@@ -231,10 +251,11 @@ void analysis(my_image_comp *in, my_image_comp *out, int spacing, int offset, fl
     float *tempPicBuf = tempPic + out->width*in->border;
 
     //apply lowpass filter to the rows
-    for(int r = -LP_HL; r < in->height + LP_HL; r++){
+    for(int r = -LP_HL*spacing+offset; r < in->height + LP_HL*spacing+offset; r+=spacing){
         for(int c = offset; c < out->width; c+=2*spacing){
             float sum = 0.0F;
             for(int n = -LP_HL; n <= LP_HL; n++){
+                //printf("spacing = %d, c = %d, n = %d, c+spacing*n = %d\n", spacing, c, n, c+spacing*n);
                 sum += LPfilter[n] * in->buf[r*in->stride+c+spacing*n];
             }
             tempPicBuf[r*out->width + c] = sum;
@@ -242,7 +263,7 @@ void analysis(my_image_comp *in, my_image_comp *out, int spacing, int offset, fl
     }
 
     //apply highpass filter to the rows
-    for(int r = -LP_HL; r < in->height + LP_HL; r++){
+    for(int r = -LP_HL*spacing+offset; r < in->height + LP_HL*spacing+offset; r+=spacing){
         for(int c = offset+spacing; c < out->width; c+=2*spacing){
             float sum = 0.0F;
             for(int n = -HP_HL; n <= HP_HL; n++){
@@ -254,7 +275,7 @@ void analysis(my_image_comp *in, my_image_comp *out, int spacing, int offset, fl
 
     //apply lowpass filter to the columns
     for(int r = offset; r < out->height; r+=2*spacing){
-        for(int c = 0; c < out->width; c++){
+        for(int c = offset; c < out->width; c+=spacing){
             float sum = 0.0F;
             for(int n = -LP_HL; n <= LP_HL; n++){
                 sum += LPfilter[n] * tempPicBuf[(r+spacing*n)*out->stride+c];
@@ -265,7 +286,7 @@ void analysis(my_image_comp *in, my_image_comp *out, int spacing, int offset, fl
 
     //apply highpass filter to the columns
     for(int r = offset+spacing; r < out->height; r+=2*spacing){
-        for(int c = 0; c < out->width; c++){
+        for(int c = offset; c < out->width; c+=spacing){
             float sum = 0.0F;
             for(int n = -HP_HL; n <= HP_HL; n++){
                 sum += HPfilter[n] * tempPicBuf[(r+spacing*n)*out->stride+c];
@@ -290,49 +311,116 @@ void synthesis(my_image_comp *in, my_image_comp *out, int spacing, int offset, f
         out->handle[i] = 0;
     }
 
+    /*printf("\nspacing = %d, offset = %d\n", spacing, offset);
+    printf("Input\n");
+    for(int r = 0; r < in->height; r++){
+        for(int c = 0; c < in->width; c++){
+            printf("%f ", in->buf[r*in->stride+c]);
+        }
+        printf("\n");
+    }
+
+
+    printf("\n low pass filter:\n");
+    for(int i = -LP_HL; i <= LP_HL; i++){
+        printf("%f ", LPfilter[i]);
+    }
+    printf("\n");*/
+
     //apply lowpass filter to the rows
-    for(int r = -HP_HL; r < in->height + HP_HL; r++){
-        for(int c = -HP_HL+offset; c < in->stride; c+=2*spacing){
+    printf("\nLow pass:\n");
+    for(int r = -HP_HL*spacing+offset; r < in->height + HP_HL*spacing+offset; r+=spacing){
+        for(int c = -HP_HL*spacing+offset; c < in->stride + HP_HL*spacing+offset; c+=2*spacing){
             for(int n = -LP_HL; n <= LP_HL; n++){
-                if(c+n >= offset && c+n < out->width){
-                    tempPicBuf[r*out->width+c+n] += LPfilter[n] * in->buf[r*in->stride+c];
+                if(c+spacing*n >= offset && c+spacing*n < out->width){
+                    //printf("%d, %d, %d, %d-> %d\n", spacing, r, c, n, c+n*spacing);
+                    tempPicBuf[r*out->width+c+spacing*n] += LPfilter[n] * in->buf[r*in->stride+c];
                 }
             }
         }
     }
+
+    /*printf("\nhigh pass filter:\n");
+    for(int i = -HP_HL; i <= HP_HL; i++){
+        printf("%f ", HPfilter[i]);
+    }
+    printf("\n");*/
 
     //apply highpass filter to the rows
-    for(int r = -HP_HL; r < in->height + HP_HL; r++){
-        for(int c = -HP_HL+offset+spacing; c < in->stride; c+=2*spacing){
+    //printf("\nHigh pass:\n");
+    for(int r = -HP_HL*spacing+offset; r < in->height + HP_HL*spacing+offset; r+=spacing){
+        for(int c = -HP_HL*spacing+offset+spacing; c < in->stride + HP_HL*spacing+offset; c+=2*spacing){
             for(int n = -HP_HL; n <= HP_HL; n++){
-                if(c+n >= offset && c+n < out->width){
-                    tempPicBuf[r*out->width+c+n] += HPfilter[n] * in->buf[r*in->stride+c];
+                if(c+spacing*n >= offset && c+spacing*n < out->width){
+                    /*if(r == 9){
+                        printf("c: %d, n: %d, HPfilter = %f, in = %f, out += %f\n", c, n, HPfilter[n], in->buf[r*in->stride+c], HPfilter[n] * in->buf[r*in->stride+c]);
+                    }*/
+                    //printf("%d, %d, %d, %d-> %d\n", spacing, r, c, n, c+n*spacing);
+                    tempPicBuf[r*out->width+c+spacing*n] += HPfilter[n] * in->buf[r*in->stride+c];
                 }
             }
         }
     }
 
+    /*printf("\nTemp\n");
+    for(int r = 0; r < in->height; r++){
+        for(int c = 0; c < out->width; c++){
+            printf("%f ", tempPicBuf[r*out->width+c]);
+        }
+        printf("\n");
+    }*/
+
     //apply lowpass filter to the columns
-    for(int r = offset; r < out->height; r+=2*spacing){
-        for(int c = offset; c < out->width; c++){
+    for(int r = -HP_HL*spacing+offset; r < out->height + HP_HL*spacing+offset; r+=2*spacing){
+        for(int c = offset; c < out->width; c+=spacing){
             for(int n = -LP_HL; n <= LP_HL; n++){
-                if(r+n >= offset && r+n < out->height){
-                    out->buf[(r+n)*out->width+c] += LPfilter[n] * tempPicBuf[r*out->width+c];
+                if(r+spacing*n >= offset && r+spacing*n < out->height){
+                    out->buf[(r+spacing*n)*out->stride+c] += LPfilter[n] * tempPicBuf[r*out->width+c];
                 }
             }
         }
     }
 
     //apply highpass filter to the columns
-    for(int r = offset+spacing; r < out->height; r+=2*spacing){
-        for(int c = offset; c < out->width; c++){
+    for(int r = -HP_HL*spacing+offset+spacing; r < out->height + HP_HL*spacing+offset; r+=2*spacing){
+        for(int c = offset; c < out->width; c+=spacing){
             for(int n = -HP_HL; n <= HP_HL; n++){
-                if(r+n >= offset && r+n < out->height){
-                    out->buf[(r+n)*out->width+c] += HPfilter[n] * tempPicBuf[r*out->width+c];
+                if(r+spacing*n >= offset && r+spacing*n < out->height){
+                    /*if(r == 9){
+                        printf("c: %d, n: %d, HPfilter = %f, tempPicBuf = %f, out += %f\n", c, n, HPfilter[n], tempPicBuf[r*out->width+c], HPfilter[n] * tempPicBuf[r*out->width+c]);
+                    }*/
+                    out->buf[(r+spacing*n)*out->stride+c] += HPfilter[n] * tempPicBuf[r*out->width+c];
                 }
             }
         }
     }
+
+    /*printf("\nOutput before copying\n");
+    for(int r = 0; r < out->height; r++){
+        for(int c = 0; c < out->width; c++){
+            printf("%f ", out->buf[r*out->stride+c]);
+        }
+        printf("\n");
+    }*/
+
+    if(spacing > 1){
+        //fill in other values
+        for(int r = 0; r < out->height; r++){
+            for(int c = 0; c < out->width; c++){
+                if(r%spacing != offset || c%spacing != offset){
+                    out->buf[r*out->stride+c] = in->buf[r*in->stride+c];
+                }
+            }
+        }
+    }
+
+    /*printf("\nOutput\n");
+    for(int r = 0; r < out->height; r++){
+        for(int c = 0; c < out->width; c++){
+            printf("%f ", out->buf[r*out->stride+c]);
+        }
+        printf("\n");
+    }*/
 
     delete[] tempPic;
 }
@@ -385,6 +473,17 @@ void increaseWaveletLevel(my_image_comp *in, my_image_comp *out, int scale){
     for(int r = 0; r < out->height; r+=scale){
         for(int c = 0; c < out->width; c+=scale){
             out->buf[r*out->stride+c] = in->buf[(r/scale)*in->stride+(c/scale)];
+        }
+    }
+}
+
+void copyBuffer(my_image_comp *copyFrom, my_image_comp *copyTo){
+    assert(copyFrom->height == copyTo->height);
+    assert(copyFrom->width == copyTo->width);
+
+    for(int r = 0; r < copyTo->height; r++){
+        for(int c = 0; c < copyTo->width; c++){
+            copyTo->buf[r*copyTo->stride + c] = copyFrom->buf[r*copyFrom->stride+c];
         }
     }
 }

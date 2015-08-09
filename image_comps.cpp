@@ -121,7 +121,8 @@ int readBMP(char* fileName, my_image_comp** input_comps, int border, int* num_co
     for (n=0; n < *num_comps; n++){
         (*input_comps)[n].init(height,width,border); // Leave a border
     }
-      
+    
+    //printf("\nReading in BMP\n");
     int r; // Declare row index
     io_byte *line = new io_byte[width*(*num_comps)];
     for (r=height-1; r >= 0; r--){
@@ -134,11 +135,13 @@ int readBMP(char* fileName, my_image_comp** input_comps, int border, int* num_co
             io_byte *src = line+n; // Points to first sample of component n
             float *dst = (*input_comps)[n].buf + r * (*input_comps)[n].stride;
             for (int c=0; c < width; c++, src+=(*num_comps)){
+                //printf("%d ", *src);
                 dst[c] = (((float) *src)-128)/128.0; 
                 // The cast to type "float" is not
                 // strictly required here, since bytes can always be
                 // converted to floats without any loss of information.
             }
+            //printf("\n");
         }
     }
     bmp_in__close(&in);
