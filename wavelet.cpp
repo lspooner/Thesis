@@ -173,14 +173,14 @@ void synthesis_5_3(my_image_comp *in, my_image_comp *out, int levels){
     float *HPfilter = HPfilterhandle + HL_S53_HP;
 
     int scale = pow(2.0, (float) levels);
-    for (int spacing=scale/2; spacing >= scale/2; spacing/=2){
+    for (int spacing=scale/2; spacing >= 1; spacing/=2){
         printf("synthesis: scale = %d, spacing = %d\n", scale, spacing);
         synthesis(in, out, spacing, 0, LPfilter, HPfilter, HL_S53_LP, HL_S53_HP);
-        /*if(spacing > 1){
+        if(spacing > 1){
             printf("performing boundary extension\n");
             copyBuffer(out, in);
             in->perform_boundary_extension_symmetric();
-        }*/
+        }
     }
 }
 
@@ -255,7 +255,6 @@ void analysis(my_image_comp *in, my_image_comp *out, int spacing, int offset, fl
         for(int c = offset; c < out->width; c+=2*spacing){
             float sum = 0.0F;
             for(int n = -LP_HL; n <= LP_HL; n++){
-                //printf("spacing = %d, c = %d, n = %d, c+spacing*n = %d\n", spacing, c, n, c+spacing*n);
                 sum += LPfilter[n] * in->buf[r*in->stride+c+spacing*n];
             }
             tempPicBuf[r*out->width + c] = sum;
@@ -278,7 +277,7 @@ void analysis(my_image_comp *in, my_image_comp *out, int spacing, int offset, fl
         for(int c = offset; c < out->width; c+=spacing){
             float sum = 0.0F;
             for(int n = -LP_HL; n <= LP_HL; n++){
-                sum += LPfilter[n] * tempPicBuf[(r+spacing*n)*out->stride+c];
+                sum += LPfilter[n] * tempPicBuf[(r+spacing*n)*out->width+c];
             }
             out->buf[r*out->stride+c] = sum;
         }
@@ -289,9 +288,20 @@ void analysis(my_image_comp *in, my_image_comp *out, int spacing, int offset, fl
         for(int c = offset; c < out->width; c+=spacing){
             float sum = 0.0F;
             for(int n = -HP_HL; n <= HP_HL; n++){
-                sum += HPfilter[n] * tempPicBuf[(r+spacing*n)*out->stride+c];
+                sum += HPfilter[n] * tempPicBuf[(r+spacing*n)*out->width+c];
             }
             out->buf[r*out->stride+c] = sum;
+        }
+    }
+
+    if(spacing > 1){
+        //fill in other values
+        for(int r = 0; r < out->height; r++){
+            for(int c = 0; c < out->width; c++){
+                if(r%spacing != offset || c%spacing != offset){
+                    out->buf[r*out->stride+c] = in->buf[r*in->stride+c];
+                }
+            }
         }
     }
 
@@ -311,7 +321,7 @@ void synthesis(my_image_comp *in, my_image_comp *out, int spacing, int offset, f
         out->handle[i] = 0;
     }
 
-    /*printf("\nspacing = %d, offset = %d\n", spacing, offset);
+    printf("\nspacing = %d, offset = %d\n", spacing, offset);
     printf("Input\n");
     for(int r = 0; r < in->height; r++){
         for(int c = 0; c < in->width; c++){
@@ -321,7 +331,7 @@ void synthesis(my_image_comp *in, my_image_comp *out, int spacing, int offset, f
     }
 
 
-    printf("\n low pass filter:\n");
+    /*printf("\n low pass filter:\n");
     for(int i = -LP_HL; i <= LP_HL; i++){
         printf("%f ", LPfilter[i]);
     }
@@ -362,13 +372,13 @@ void synthesis(my_image_comp *in, my_image_comp *out, int spacing, int offset, f
         }
     }
 
-    /*printf("\nTemp\n");
+    printf("\nTemp\n");
     for(int r = 0; r < in->height; r++){
         for(int c = 0; c < out->width; c++){
             printf("%f ", tempPicBuf[r*out->width+c]);
         }
         printf("\n");
-    }*/
+    }
 
     //apply lowpass filter to the columns
     for(int r = -HP_HL*spacing+offset; r < out->height + HP_HL*spacing+offset; r+=2*spacing){
@@ -414,13 +424,13 @@ void synthesis(my_image_comp *in, my_image_comp *out, int spacing, int offset, f
         }
     }
 
-    /*printf("\nOutput\n");
+    printf("\nOutput\n");
     for(int r = 0; r < out->height; r++){
         for(int c = 0; c < out->width; c++){
             printf("%f ", out->buf[r*out->stride+c]);
         }
         printf("\n");
-    }*/
+    }
 
     delete[] tempPic;
 }
