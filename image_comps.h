@@ -36,6 +36,7 @@ struct my_image_comp {
     void perform_boundary_extension();
     void perform_boundary_extension_zero_padding();
     void perform_boundary_extension_symmetric();
+    void perform_boundary_extension_wavelet(int spacing);
 };
 
 int readBMP(char* fileName, my_image_comp** in, int border, int* num_comps);

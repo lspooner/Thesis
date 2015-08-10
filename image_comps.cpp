@@ -106,6 +106,44 @@ void my_image_comp::perform_boundary_extension_symmetric(){
     }
 }
 
+void my_image_comp::perform_boundary_extension_wavelet(int spacing){
+    //not technically the right way to do, just assuming our image is bigger than the extension
+    int r, c;
+
+    int extendColumn = width - 2*spacing;
+    int extendRow = height - 2*spacing;
+
+    // First extend upwards
+    float *first_line = buf;
+    for (r=1; r <= border; r++){
+        for (c=0; c < width; c++){
+            first_line[-r*stride+c] = first_line[r*stride+c];
+        }
+    }
+
+    // Now extend downwards
+    float *last_line = buf+(height-1)*stride;
+    int r_extended = extendRow;
+    for (r=1; r <= border; r++){
+        for (c=0; c < width; c++){
+            last_line[r*stride+c] = buf[r_extended*stride+c];
+        }
+        r_extended--;
+    }
+
+    // Now extend all rows to the left and to the right
+    float *left_edge = buf-border*stride;
+    float *right_edge = left_edge + width - 1;
+    for (r=-border; r < height+border; r++, left_edge+=stride, right_edge+=stride){
+        int c_extended = extendColumn;
+        for (c=1; c <= border; c++){
+            left_edge[-c] = left_edge[c];
+            right_edge[c] = buf[r*stride + c_extended];
+            c_extended--;
+        }
+    }
+}
+
 int readBMP(char* fileName, my_image_comp** input_comps, int border, int* num_comps){
     // Read the input image
     bmp_in in;
