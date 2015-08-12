@@ -123,8 +123,8 @@ int combineWavelets(char* LRinputFile, char* HRinputFile, char* outputFile, int 
     int width = inLR[0].width, height = inLR[0].height;
 
     // Allocate storage for the filtered output
-    int outHeight = height;
-    int outWidth = width;
+    int outHeight = height*LRspacing;
+    int outWidth = width*LRspacing;
     my_image_comp *output_comps = new my_image_comp[num_comps];
     for (int n=0; n < num_comps; n++){
         output_comps[n].init(outHeight, outWidth, 0); // Don't need a border for output
@@ -146,8 +146,8 @@ int combineWavelets(char* LRinputFile, char* HRinputFile, char* outputFile, int 
 
 void combineWavelets(my_image_comp *inLR, my_image_comp *inHR, my_image_comp *out, int LRspacing, int method, int Roffset, int Coffset){
     //note: currently assumes HR image is completely enclosed in LR images
-    assert(out->height == inLR->height);
-    assert(out->width == inLR->width);
+    assert(out->height == inLR->height*LRspacing);
+    assert(out->width == inLR->width*LRspacing);
 
     if(method == MAX_VALUE){
         maxValueCombination(inLR, inHR, out, LRspacing, Roffset, Coffset);
@@ -160,10 +160,14 @@ void maxValueCombination(my_image_comp *inLR, my_image_comp *inHR, my_image_comp
 
     for(int r = 0; r < out->height; r++){
         for(int c = 0; c < out->width; c++){
-            if(r < Roffset || r > Roffset_high || c < Coffset || c > Coffset_high || (r%LRspacing == 0 && c%LRspacing == 0)){
-                out->buf[r*out->stride+c] = inLR->buf[r*inLR->stride+c];
+            if(r < Roffset || r >= Roffset_high || c < Coffset || c >= Coffset_high ){
+                if(r%LRspacing == 0 && c%LRspacing == 0){
+                    out->buf[r*out->stride+c] = inLR->buf[(r/LRspacing)*inLR->stride+(c/LRspacing)];
+                } else {
+                    out->buf[r*out->stride+c] = 0;
+                }
             } else {
-                out->buf[r*out->stride+c] = inHR->buf[r*inHR->stride+c];//std::max(inLR->buf[r*inLR->stride+c], inHR->buf[r*inHR->stride+c]);
+                out->buf[r*out->stride+c] = inHR->buf[(r-Roffset)*inHR->stride+(c-Coffset)];//std::max(inLR->buf[r*inLR->stride+c], inHR->buf[r*inHR->stride+c]);
             }
         }
     }
