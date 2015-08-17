@@ -45,14 +45,17 @@ int combineImages(char* LRinputFile, char* HRinputFile, char* outputFile, int wa
     }
     delete[] input_comps_HR;*/
 
+    Mat<float> offset(2, 1);
+    offset(0,0) = 0;
+    offset(1,0) = 0;
+
     my_image_comp *inLR_wavelet_small = new my_image_comp[num_comps];
     for (int n=0; n < num_comps; n++){
         inLR_wavelet_small[n].init(LRheight, LRwidth, 0);
-        input_comps_LR[n].perform_boundary_extension_symmetric();
         if(waveletType == WAVELET_53){
-            analysis_5_3(input_comps_LR+n, inLR_wavelet_small+n, waveletLevels-levelDiff);
+            analysis_5_3(input_comps_LR+n, inLR_wavelet_small+n, waveletLevels-levelDiff, offset);
         } else {
-            analysis_9_7(input_comps_LR+n, inLR_wavelet_small+n, waveletLevels-levelDiff);
+            analysis_9_7(input_comps_LR+n, inLR_wavelet_small+n, waveletLevels-levelDiff, offset);
         }
     }
     delete[] input_comps_LR;
@@ -61,7 +64,6 @@ int combineImages(char* LRinputFile, char* HRinputFile, char* outputFile, int wa
     for (int n=0; n < num_comps; n++){
         inLR_wavelet[n].init(Outheight, Outwidth, 0);
         increaseWaveletLevel(inLR_wavelet_small+n, inLR_wavelet+n, scaleDiff);
-        inLR_wavelet[n].perform_boundary_extension_symmetric();
     }
     delete[] inLR_wavelet_small;
 
@@ -69,11 +71,10 @@ int combineImages(char* LRinputFile, char* HRinputFile, char* outputFile, int wa
     for (int n=0; n < num_comps; n++){
         //should be inHR_transformed but will be input_comps_HR until this is implemented
         inHR_wavelet[n].init(HRheight, HRwidth, 0);
-        input_comps_HR[n].perform_boundary_extension_symmetric();
         if(waveletType == WAVELET_53){
-            analysis_5_3(input_comps_HR+n, inHR_wavelet+n, waveletLevels);
+            analysis_5_3(input_comps_HR+n, inHR_wavelet+n, waveletLevels, offset);
         } else {
-            analysis_9_7(input_comps_HR+n, inHR_wavelet+n, waveletLevels);
+            analysis_9_7(input_comps_HR+n, inHR_wavelet+n, waveletLevels, offset);
         }
     }
     delete[] input_comps_HR;
@@ -81,7 +82,7 @@ int combineImages(char* LRinputFile, char* HRinputFile, char* outputFile, int wa
     my_image_comp *out_wavelet = new my_image_comp[num_comps];
     for (int n=0; n < num_comps; n++){
         out_wavelet[n].init(Outheight, Outwidth, HL_S97_HP*pow(2, waveletLevels)+HL_S97_LP);
-        combineWavelets(inLR_wavelet+n, inHR_wavelet+n, out_wavelet+n, pow(2, waveletLevels), combineType, 99, 99);
+        combineWavelets(inLR_wavelet+n, inHR_wavelet+n, out_wavelet+n, pow(2, waveletLevels), combineType, 200, 200);
     }
     delete[] inLR_wavelet;
     delete[] inHR_wavelet;
@@ -89,11 +90,10 @@ int combineImages(char* LRinputFile, char* HRinputFile, char* outputFile, int wa
     my_image_comp *output_comps = new my_image_comp[num_comps];
     for (int n=0; n < num_comps; n++){
         output_comps[n].init(Outheight, Outwidth, 0); // Don't need a border for output
-        out_wavelet[n].perform_boundary_extension_symmetric();
         if(waveletType == WAVELET_53){
-            synthesis_5_3(out_wavelet+n, output_comps+n, waveletLevels);
+            synthesis_5_3(out_wavelet+n, output_comps+n, waveletLevels, offset);
         } else {
-            synthesis_9_7(out_wavelet+n, output_comps+n, waveletLevels);
+            synthesis_9_7(out_wavelet+n, output_comps+n, waveletLevels, offset);
         }
     }
     delete[] out_wavelet;
@@ -146,8 +146,8 @@ int combineWavelets(char* LRinputFile, char* HRinputFile, char* outputFile, int 
 
 void combineWavelets(my_image_comp *inLR, my_image_comp *inHR, my_image_comp *out, int LRspacing, int method, int Roffset, int Coffset){
     //note: currently assumes HR image is completely enclosed in LR images
-    assert(out->height == inLR->height*LRspacing);
-    assert(out->width == inLR->width*LRspacing);
+    //assert(out->height == inLR->height*LRspacing);
+    //assert(out->width == inLR->width*LRspacing);
 
     if(method == MAX_VALUE){
         maxValueCombination(inLR, inHR, out, LRspacing, Roffset, Coffset);

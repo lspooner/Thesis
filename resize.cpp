@@ -176,11 +176,19 @@ void reductionFilter(my_image_comp *in, my_image_comp *out, int halfLength, int 
     for(int r = -halfLength; r < in->height + halfLength; r++){
         for(int c = 0; c < out->width; c++){
             float sum = 0.0F;
+            bool invalid = false;
             int inputC = c*scale;
-            for(int n = -halfLength; n <= halfLength; n++){
+            for(int n = -halfLength; n <= halfLength && !invalid; n++){
+                if(in->buf[r*in->stride+inputC+n] == INVALID){
+                    invalid = true;
+                }
                 sum += filter[n] * in->buf[r*in->stride+inputC+n];
             }
-            tempPicBuf[r*out->width + c] = sum;
+            if(invalid){
+                tempPicBuf[r*out->width + c] = INVALID;
+            } else {
+                tempPicBuf[r*out->width + c] = sum;
+            }
         }
     }
 
@@ -188,11 +196,19 @@ void reductionFilter(my_image_comp *in, my_image_comp *out, int halfLength, int 
     for(int r = 0; r < out->height; r++){
         for(int c = 0; c < out->width; c++){
             float sum = 0.0F;
+            bool invalid = false;
             int inputR = r*scale;
-            for(int n = -halfLength; n <= halfLength; n++){
+            for(int n = -halfLength; n <= halfLength && !invalid; n++){
+                if(tempPicBuf[(inputR+n)*out->width+c] == INVALID){
+                    invalid = true;
+                }
                 sum += filter[n] * tempPicBuf[(inputR+n)*out->width+c];
             }
-            out->buf[r*out->stride+c] = sum;
+            if(invalid){
+                out->buf[r*out->stride+c] = INVALID;
+            } else {
+                out->buf[r*out->stride+c] = sum;
+            }
         }
     }
 

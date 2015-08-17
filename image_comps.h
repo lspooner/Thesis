@@ -6,6 +6,13 @@
 // Copyright 2007, David Taubman, The University of New South Wales (UNSW)
 /*****************************************************************************/
 
+#include <armadillo>
+
+#define INVALID 42
+
+using namespace std;
+using namespace arma;
+
 /*****************************************************************************/
 /* STRUCT                        my_image_comp                               */
 /*****************************************************************************/
@@ -36,7 +43,7 @@ struct my_image_comp {
     void perform_boundary_extension();
     void perform_boundary_extension_zero_padding();
     void perform_boundary_extension_symmetric();
-    void perform_boundary_extension_wavelet(int spacing);
+    void perform_boundary_extension_wavelet(int spacing, Mat<float> offset);
 };
 
 int readBMP(char* fileName, my_image_comp** in, int border, int* num_comps);

@@ -106,12 +106,12 @@ void my_image_comp::perform_boundary_extension_symmetric(){
     }
 }
 
-void my_image_comp::perform_boundary_extension_wavelet(int spacing){
+void my_image_comp::perform_boundary_extension_wavelet(int spacing, Mat<float> offset){
     //not technically the right way to do, just assuming our image is bigger than the extension
     int r, c;
 
-    int extendColumn = width - 2*spacing;
-    int extendRow = height - 2*spacing;
+    int extendColumn = width+(int)offset(0,0)%spacing - 2*spacing;
+    int extendRow = height+(int)offset(1,0)%spacing - 2*spacing;
 
     // First extend upwards
     float *first_line = buf;
