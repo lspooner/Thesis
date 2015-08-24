@@ -50,10 +50,10 @@ int main(int argc, char *argv[]){
     printf("Testing scaling transform\n");
 
     Mat<float> sTransform(2, 2);
-    sTransform(0,0) = 2;
+    sTransform(0,0) = 0.5;
     sTransform(0,1) = 0;
     sTransform(1,0) = 0;
-    sTransform(1,1) = 2;
+    sTransform(1,1) = 0.5;
 
     int scaleDiff;
 
@@ -99,6 +99,7 @@ int main(int argc, char *argv[]){
     assert(transform(1,1) == 1);
     assert(transform(1,2) == 0);
 
+    delete image;
     printf("Test Passed!\n");
 
     /*printf("Generating 16x16 image and 14x14 image offset by 1 and checking affine match\n");
@@ -177,8 +178,8 @@ int main(int argc, char *argv[]){
     my_image_comp *HR_lenna = NULL;
     assert(readBMP((char*)"images/lenna_mono_eye.bmp", &HR_lenna, 40, &num_comps)==0);
 
-    float LRpoints_lenna[6] = {50, 50, 50, 54, 54, 50};
-    float HRpoints_lenna[6] = {0, 0, 0, 1, 1, 0};
+    float LRpoints_lenna[6] = {50, 50, 50, 51, 51, 51};
+    float HRpoints_lenna[6] = {0, 0, 0, 4, 4, 4};
 
     my_image_comp *HR_lenna_reduced = new my_image_comp;
     HR_lenna_reduced->init(HR_lenna->height/4, HR_lenna->width/4, 0);
@@ -200,12 +201,17 @@ int main(int argc, char *argv[]){
 
     transform = matchImages(LR_lenna, HR_lenna, LRpoints_lenna, HRpoints_lenna);
     cout << transform << endl;
-    assert(transform(0,0) == 4);
+    assert(transform(0,0) == 0.25);
     assert(transform(0,1) == 0);
     assert(transform(0,2) == 50);
     assert(transform(1,0) == 0);
-    assert(transform(1,1) == 4);
+    assert(transform(1,1) == 0.25);
     assert(transform(1,2) == 50);
+
+    delete LR_lenna;
+    delete HR_lenna;
+    delete HR_lenna_reduced;
+    delete LR_lenna_subset;
 
     printf("Test Passed!\n");
 

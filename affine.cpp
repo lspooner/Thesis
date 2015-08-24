@@ -129,6 +129,7 @@ Mat<float> matchImages(my_image_comp *LR, my_image_comp *HR, float *LRpoints, fl
             }
         }
     }
+    delete HRTransformed;
     return transform_offset;
 }
 
@@ -156,6 +157,8 @@ Mat<float> scaleTransform(Mat<float> transform, int *scaleDiff){
     assert(transform.n_rows == 2);
     assert(transform.n_cols == 2);
 
+    Mat<float> tinv = inv(transform);
+
     Mat<float> *corners = new Mat<float>[4];
     for(int i = 0; i < 4; i++){
         corners[i].resize(2, 1);
@@ -172,17 +175,23 @@ Mat<float> scaleTransform(Mat<float> transform, int *scaleDiff){
     float maxCorner = PI;
 
     for(int i = 0; i < 4; i++){
-        Mat<float> outCorner = transform*corners[i];
+        Mat<float> outCorner = tinv*corners[i];
         maxCorner = max(maxCorner, abs(outCorner(0,0)));
         maxCorner = max(maxCorner, abs(outCorner(1,0)));
     }
 
-    *scaleDiff = pow(2, (int)(log2(maxCorner/PI)+0.5));
+    maxCorner /= PI;
+
+    //printf("MaxCorner = %f\n", maxCorner);
+
+    *scaleDiff = pow(2, (int)(log2(maxCorner)+0.5));
 
     //printf("end of scaling function:, scaleDiff = %d, maxCorner = %f\n", *scaleDiff, maxCorner);
     //cout << transform << endl; 
     //cout << (1.0/(float)(*scaleDiff))*transform << endl; 
-    return (1.0/(float)(*scaleDiff))*transform;
+    delete[] corners;
+    //return ((maxCorner*maxCorner)/(float)(*scaleDiff))*transform;
+    return (1.0/(float)*scaleDiff)*tinv;
 }
 
 int resampleImage(char* inputFile, char* outputFile, arma::Mat<float> transform){
@@ -265,10 +274,6 @@ void resampleImage(my_image_comp *in, my_image_comp *out, Mat<float> transform, 
                     y = 1+y;
                 }
                 out->buf[r*out->stride+c] = bilinear_interpolation_2D(x, y, v_00, v_01, v_10, v_11);
-                if(out->buf[r*out->stride+c] < -1 || out->buf[r*out->stride+c] >= 1){
-                    printf("ERROR! r = %d, inR = %f, c = %d, inC = %f\n", r, inR, c, inC);
-                    assert(0);
-                }
             } else {
                 //printf("NO OUTPUT, r = %d, inR = %f, c = %d, inC = %f\n", r, inR, c, inC);
                 out->buf[r*out->stride+c] = INVALID;
@@ -303,6 +308,7 @@ double getMetric_Intensity(my_image_comp *LR, my_image_comp *HR, Mat<float> offs
             }
         }
     }
+    delete HR_reduced;
     return mse/numPixels;
 }
 
@@ -323,6 +329,7 @@ double getMetric_Wavelet(my_image_comp *LR, my_image_comp *HR, Mat<float> offset
     LR_offset_wavelet->init(LR_offset->height, LR_offset->width, 0);
 
     analysis_5_3(LR_offset, LR_offset_wavelet, MATCH_LEVELS, analysis_offset);
+    delete LR_offset;
 
     my_image_comp *HR_wavelet = new my_image_comp;
     HR_wavelet->init(HR->height, HR->width, 0);
@@ -344,6 +351,8 @@ double getMetric_Wavelet(my_image_comp *LR, my_image_comp *HR, Mat<float> offset
             }
         }
     }
+    delete LR_offset_wavelet;
+    delete HR_wavelet;
     return mse/numPixels;
 }
 
@@ -364,6 +373,7 @@ double getMetric_Wavelet2(my_image_comp *LR, my_image_comp *HR, Mat<float> offse
     LR_offset_wavelet->init(LR_offset->height, LR_offset->width, 0);
 
     analysis_5_3(LR_offset, LR_offset_wavelet, 2, analysis_offset);
+    delete LR_offset;
 
     my_image_comp *HR_wavelet = new my_image_comp;
     HR_wavelet->init(HR->height, HR->width, 0);
@@ -385,6 +395,8 @@ double getMetric_Wavelet2(my_image_comp *LR, my_image_comp *HR, Mat<float> offse
             }
         }
     }
+    delete LR_offset_wavelet;
+    delete HR_wavelet;
     return mse/numPixels;
 }
 

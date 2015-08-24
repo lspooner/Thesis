@@ -11,6 +11,7 @@ void my_image_comp::init(int height, int width, int border){
     if (handle != NULL){
         delete[] handle; // Delete mem allocated by any previous `init' call
     }
+    printf("Getting %lu bytes\n", sizeof(float)*stride*height+2*border);
     handle = new float[stride*(height+2*border)];
     buf = handle + (border*stride) + border;
 }

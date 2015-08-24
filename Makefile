@@ -19,8 +19,8 @@ wavelet: clean $(SOURCES) wavelet.cpp main_wavelet.cpp
 affine: clean $(SOURCES) affine.cpp main_affine.cpp wavelet.cpp resize.cpp
 	$(CC) $(CFLAGS) affine $(SOURCES) affine.cpp main_affine.cpp wavelet.cpp resize.cpp -larmadillo
 
-combine: clean $(SOURCES) combine.cpp main_combine.cpp wavelet.cpp
-	$(CC) $(CFLAGS) combine $(SOURCES) combine.cpp main_combine.cpp wavelet.cpp
+combine: clean $(SOURCES) combine.cpp main_combine.cpp wavelet.cpp affine.cpp resize.cpp
+	$(CC) $(CFLAGS) combine $(SOURCES) combine.cpp main_combine.cpp wavelet.cpp affine.cpp resize.cpp -larmadillo
 
 unit_wavelet: clean $(SOURCES) wavelet.cpp unit_wavelet.cpp
 	$(CC) $(UFLAGS) unit_wavelet $(SOURCES) wavelet.cpp unit_wavelet.cpp

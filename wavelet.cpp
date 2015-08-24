@@ -53,19 +53,23 @@ int analysis_5_3(char* inputFile, char* outputFile, int levels){
 }
 
 void analysis_5_3(my_image_comp *in, my_image_comp *out, int levels, Mat<float> offset){
-    float LPfilterhandle[5] = {-0.125, 0.25, 0.75, 0.25, -0.125};
-    float HPfilterhandle[3] = {-0.25, 0.5, -0.25};
+    if(levels != 0){
+        float LPfilterhandle[5] = {-0.125, 0.25, 0.75, 0.25, -0.125};
+        float HPfilterhandle[3] = {-0.25, 0.5, -0.25};
 
-    float *LPfilter = LPfilterhandle + HL_A53_LP;
-    float *HPfilter = HPfilterhandle + HL_A53_HP;
+        float *LPfilter = LPfilterhandle + HL_A53_LP;
+        float *HPfilter = HPfilterhandle + HL_A53_HP;
 
-    int scale = pow(2.0, (float) levels);
-    for (int spacing=1; spacing < scale; spacing*=2){
-        in->perform_boundary_extension_wavelet(spacing, offset);
-        analysis(in, out, spacing, offset, LPfilter, HPfilter, HL_A53_LP, HL_A53_HP);
-        if(spacing < scale/2){
-            copyBuffer(out, in);
+        int scale = pow(2.0, (float) levels);
+        for (int spacing=1; spacing < scale; spacing*=2){
+            in->perform_boundary_extension_wavelet(spacing, offset);
+            analysis(in, out, spacing, offset, LPfilter, HPfilter, HL_A53_LP, HL_A53_HP);
+            if(spacing < scale/2){
+                copyBuffer(out, in);
+            }
         }
+    } else {
+        copyBuffer(in, out);
     }
 }
 
