@@ -14,6 +14,8 @@
 void combineWavelets(my_image_comp *inLR, my_image_comp *inHR, my_image_comp *out, int LRspacing, int method, int Roffset, int Coffset);
 void maxValueCombination(my_image_comp *inLR, my_image_comp *inHR, my_image_comp *out, int LRspacing, int Roffset, int Coffset);
 void getLuminance(my_image_comp *in, my_image_comp *out);
+void getHRinfo(my_image_comp *image, Mat<float> offset, int scaleDiff, int height, int width, float* HRinfo);
+void getDiscontinuities(my_image_comp *image, Mat<float> offset, int height, int width, float* discontinuities);
 
 int combineImages(char* LRinputFile, char* HRinputFile, char* outputFile, int waveletType, int combineType){
     // Read the input images
@@ -46,8 +48,10 @@ int combineImages(char* LRinputFile, char* HRinputFile, char* outputFile, int wa
     //noteboard
     //float LRpoints[6] = {1337, 955, 2047, 939, 1919, 1484};
     //float HRpoints[6] = {764, 413, 3077, 353, 2666, 2132};
-    float LRpoints[6] = {1345, 959, 2055, 943, 1927, 1488};
-    float HRpoints[6] = {764, 413, 3070, 353, 2670, 2136};
+    //float LRpoints[6] = {1345, 959, 2055, 943, 1927, 1488};
+    //float HRpoints[6] = {764, 413, 3070, 353, 2670, 2136};
+    //float HRpoints[6] = {763.5, 413, 3074, 353, 2669.5, 2136};
+
 
     //1345.000000 959.000000 2055.000000 943.000000 1927.000000 1488.000000 
     //763.500000 413.000000 3074.000000 353.000000 2669.500000 2136.000000 
@@ -76,8 +80,8 @@ int combineImages(char* LRinputFile, char* HRinputFile, char* outputFile, int wa
 
 
     //bookshelf
-    //float LRpoints[6] = {1442, 1117, 1861, 1094, 1786, 1369};
-    //float HRpoints[6] = {112, 628, 2983, 502, 2457, 2381};
+    float LRpoints[6] = {1442, 1117, 1861, 1094, 1786, 1369};
+    float HRpoints[6] = {112, 628, 2983, 502, 2457, 2381};
 
     //TODO: work out borders!!!
 
@@ -171,6 +175,9 @@ int combineImages(char* LRinputFile, char* HRinputFile, char* outputFile, int wa
 
     my_image_comp *output_comps = new my_image_comp[num_comps];
 
+    float totalHRinfo = 0.0;
+    float totalDiscontinuities = 0.0;
+
     for(int n = 0; n < num_comps; n++){
         printf("n = %d, about to transform HR\n", n);
         my_image_comp *inHR_transformed = new my_image_comp;
@@ -216,6 +223,9 @@ int combineImages(char* LRinputFile, char* HRinputFile, char* outputFile, int wa
         delete inLR_wavelet;
         delete inHR_wavelet;
 
+        float HRinfo;
+        getHRinfo(out_wavelet, offset*scaleDiff, scaleDiff, HRheight, HRwidth, &HRinfo);
+
         printf("n = %d, about to synthesise\n", n);
         output_comps[n].init(Outheight, Outwidth, 0); // Don't need a border for output
         if(waveletType == WAVELET_53){
@@ -224,7 +234,15 @@ int combineImages(char* LRinputFile, char* HRinputFile, char* outputFile, int wa
             synthesis_9_7(out_wavelet, output_comps+n, waveletLevels, offset_wavelet);
         }
         delete out_wavelet;
+
+        float discontinuities;
+        getDiscontinuities(output_comps+n, offset*scaleDiff, HRheight, HRwidth, &discontinuities);
+
+        totalHRinfo += HRinfo;
+        totalDiscontinuities += discontinuities;
     }
+
+    printf("HRinfo = %f, discontinuities = %f\n", totalHRinfo, totalDiscontinuities);
 
     // Write the image back out again
     if((err_code = outputBMP(outputFile, output_comps, num_comps)) != 0){
@@ -332,6 +350,34 @@ void getLuminance(my_image_comp *in, my_image_comp *out){
 
             Mat<float> YCbCr = colourMatrix*RGB;
             out->buf[r*out->stride+c] = YCbCr(0,0);
+        }
+    }
+}
+
+void getHRinfo(my_image_comp *image, Mat<float> offset, int scaleDiff, int height, int width, float* HRinfo){
+    //calculate high res info by adding all the wavelet coefficients in the highest bands
+    *HRinfo = 0.0;
+    for(int r = (int)offset(1); r < (int)offset(1)+height; r++){
+        for(int c = (int)offset(0); c < (int)offset(0) + width; c++){
+            if(c%scaleDiff != 0 || r%scaleDiff != 0){
+                *HRinfo += abs(image->buf[r*image->stride+c]);
+            }
+        }
+    }
+}
+
+void getDiscontinuities(my_image_comp *image, Mat<float> offset, int height, int width, float* discontinuities){
+    //calculate the discontinuities by adding up the step difference around the edge of the image
+    *discontinuities = 0.0;
+    for(int r = (int)offset(1); r <= (int)offset(1)+height; r+=height){
+        for(int c = (int)offset(0); c < (int)offset(0)+width; c++){
+            *discontinuities += abs(image->buf[r*image->stride+c] - image->buf[(r-1)*image->stride+c]);
+        }
+    }
+
+    for(int c = (int)offset(0); c <= (int)offset(0)+width; c+=width){
+        for(int r = (int)offset(1); r < (int)offset(1)+height; r++){
+            *discontinuities += abs(image->buf[r*image->stride+c] - image->buf[r*image->stride+c-1]);
         }
     }
 }
