@@ -7,25 +7,25 @@ all: resize diff wavelet affine combine
 
 unit_all: unit_wavelet unit_affine
 
-resize: clean $(SOURCES) resize.cpp main_resize.cpp
-	$(CC) $(CFLAGS) resize $(SOURCES) resize.cpp main_resize.cpp
+resize: $(SOURCES) resize.cpp main_resize.cpp
+	$(CC) $(CFLAGS) resize $(SOURCES) resize.cpp main_resize.cpp -larmadillo
 
-diff: clean $(SOURCES) main_diff.cpp
-	$(CC) $(CFLAGS) diff $(SOURCES) main_diff.cpp
+diff: $(SOURCES) main_diff.cpp
+	$(CC) $(CFLAGS) diff $(SOURCES) main_diff.cpp -larmadillo
 
-wavelet: clean $(SOURCES) wavelet.cpp main_wavelet.cpp
-	$(CC) $(CFLAGS) wavelet $(SOURCES) wavelet.cpp main_wavelet.cpp
+wavelet: $(SOURCES) wavelet.cpp main_wavelet.cpp
+	$(CC) $(CFLAGS) wavelet $(SOURCES) wavelet.cpp main_wavelet.cpp -larmadillo
 
-affine: clean $(SOURCES) affine.cpp main_affine.cpp wavelet.cpp resize.cpp
+affine: $(SOURCES) affine.cpp main_affine.cpp wavelet.cpp resize.cpp
 	$(CC) $(CFLAGS) affine $(SOURCES) affine.cpp main_affine.cpp wavelet.cpp resize.cpp -larmadillo
 
-combine: clean $(SOURCES) combine.cpp main_combine.cpp wavelet.cpp affine.cpp resize.cpp
+combine: $(SOURCES) combine.cpp main_combine.cpp wavelet.cpp affine.cpp resize.cpp
 	$(CC) $(CFLAGS) combine $(SOURCES) combine.cpp main_combine.cpp wavelet.cpp affine.cpp resize.cpp -larmadillo
 
-unit_wavelet: clean $(SOURCES) wavelet.cpp unit_wavelet.cpp
+unit_wavelet: $(SOURCES) wavelet.cpp unit_wavelet.cpp
 	$(CC) $(UFLAGS) unit_wavelet $(SOURCES) wavelet.cpp unit_wavelet.cpp
 
-unit_affine: clean $(SOURCES) affine.cpp unit_affine.cpp wavelet.cpp resize.cpp
+unit_affine: $(SOURCES) affine.cpp unit_affine.cpp wavelet.cpp resize.cpp
 	$(CC) $(UFLAGS) unit_affine $(SOURCES) affine.cpp unit_affine.cpp wavelet.cpp resize.cpp -larmadillo
 
 clean:

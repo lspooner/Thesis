@@ -18,10 +18,12 @@ using namespace arma;
 Mat<float> matchImages(my_image_comp *LR, my_image_comp *HR, float *LRpoints, float *HRpoints);
 Mat<float> computeAffineTransform(float *LRpoints, float *HRpoints);
 Mat<float> scaleTransform(Mat<float> transform, int *scaleDiff);
+void scaleTransform(Mat<float> transform_input, int waveletLevels, Mat<float> *sTransform, Mat<float> *HRoffset, Mat<float> *LRoffset, int *scaleDiff);
 void resampleImage(my_image_comp *in, my_image_comp *out, Mat<float> transform, Mat<float> offset);
 double getMatchMetric(my_image_comp *LR, my_image_comp *HR, Mat<float> offset, int scaleDiff);
 double getMetric_Wavelet(my_image_comp *LR, my_image_comp *HR, Mat<float> offset, int scaleDiff);
 double getMetric_Wavelet2(my_image_comp *LR, my_image_comp *HR, Mat<float> offset, int scaleDiff);
+double getMetric_MultipleWavelet(my_image_comp *LR, my_image_comp *HR, Mat<float> offset, int scaleDiff, int levels);
 double getMetric_Intensity(my_image_comp *LR, my_image_comp *HR, Mat<float> offset, int scaleDiff);
 float bilinear_interpolation_2D(float x, float y, float val_00, float val_01, float val_10, float val_11);
 float bilinear_interpolation_1D(float x, float x0_val, float x1_val);
@@ -54,7 +56,17 @@ int matchImages(char *LRfilename, char *HRfilename, float* LRpoints, float *HRpo
 
 Mat<float> matchImages(my_image_comp *LR, my_image_comp *HR, float *LRpoints, float *HRpoints){
     Mat<float> transform_offset = computeAffineTransform(LRpoints, HRpoints);
-    Mat<float> transform = transform_offset.submat(0, 0, 1, 1);
+
+    int waveletLevels = 4;
+
+    Mat<float> transform(2,2);
+    Mat<float> offset_resample(2,1);
+    Mat<float> offset(2,1);
+    int scaleDiff;
+
+    scaleTransform(transform_offset, waveletLevels, &transform, &offset_resample, &offset, &scaleDiff);
+
+    /*Mat<float> transform = transform_offset.submat(0, 0, 1, 1);
     Mat<float> offset = transform_offset.submat(0, 2, 1, 2);
     int scaleDiff;
     transform = scaleTransform(transform, &scaleDiff);
@@ -63,72 +75,127 @@ Mat<float> matchImages(my_image_comp *LR, my_image_comp *HR, float *LRpoints, fl
     offset_resample(0,0) = offset(0,0)-(int)offset(0,0);
     offset_resample(1,0) = offset(1,0)-(int)offset(1,0);
     offset(0,0) = (float)((int)offset(0,0));
-    offset(1,0) = (float)((int)offset(1,0));
+    offset(1,0) = (float)((int)offset(1,0));*/
 
     my_image_comp *HRTransformed = new my_image_comp;
     //int spacing = (int)pow(2, scaleDiff+MATCH_LEVELS-1);
     //int boundary = spacing*2+1;
-    int boundary = 10*scaleDiff;
+    int boundary = 2*256+1;
     HRTransformed->init(HR->height, HR->width, boundary);
     resampleImage(HR, HRTransformed, transform, offset_resample);
 
     double bestMatchQuality = getMatchMetric(LR, HRTransformed, offset, scaleDiff);
     printf("Initial mse = %f\n", bestMatchQuality);
 
-    for(int i = 0; i < 2; i++){
-        for(int j = 0; j < 3; j++){
-            for(float diff = -0.1; diff <= 0.1; diff+=0.2){
-                printf("i = %d, j = %d, diff = %f\n", i, j, diff);
-                cout << transform_offset << endl;
-                transform_offset(i, j) += diff;
-                cout << transform_offset << endl;
-                transform = transform_offset.submat(0, 0, 1, 1);
-                offset = transform_offset.submat(0, 2, 1, 2);
+    //for(int i = 0; i < 2; i++){
+        //for(int j = 0; j < 3; j++){
+    //float diff[6];
+    float tempHRpoints[6];
+    for (int i = 0; i < 6; ++i){
+        tempHRpoints[i] = HRpoints[i];
+    }
+    float tempBestMatchQuality = bestMatchQuality;
+    for(int i = 0; i < 6; i+=2){
+        for(float diff_x = -0.5; diff_x <= 0.5; diff_x+=0.5){
+            for(float diff_y = -0.5; diff_y <= 0.5; diff_y+=0.5){
+                if(!(diff_x == 0 && diff_y == 0)){
+    /*for(diff[0] = -1; diff[0] <= 1; diff[0]++){
+        for(diff[1] = -1; diff[1] <= 1; diff[1]++){
+            for(diff[2] = -1; diff[2] <= 1; diff[2]++){
+                for(diff[3] = -1; diff[3] <= 1; diff[3]++){
+                    for(diff[4] = -1; diff[4] <= 1; diff[4]++){
+                        for(diff[5] = -1; diff[5] <= 1; diff[5]++){
+                            for(int i = 0; i < 6; i++){
+                                HRpoints[i] += diff[i];
+                            }*/
+                    //printf("i = %d, diff_x = %f, diff_y = %f\n", i, diff_x, diff_y);
+                    //cout << transform_offset << endl;
+                    //transform_offset(i, j) += diff;
+                    //cout << transform_offset << endl;
+                    HRpoints[i] += diff_x;
+                    HRpoints[i+1] += diff_y;
+                    transform_offset = computeAffineTransform(LRpoints, HRpoints);
+                    /*transform = transform_offset.submat(0, 0, 1, 1);
+                    offset = transform_offset.submat(0, 2, 1, 2);
 
-                //printf("Transform before scaling:\n");
-                //cout << transform << endl;
-                transform = scaleTransform(transform, &scaleDiff);
-                //printf("Transform after scaling:\n");
-                //cout << transform << endl;
+                    //printf("Transform before scaling:\n");
+                    //cout << transform << endl;
+                    transform = scaleTransform(transform, &scaleDiff);
+                    //printf("Transform after scaling:\n");
+                    //cout << transform << endl;
 
-                offset_resample(0,0) = offset(0,0)-(int)offset(0,0);
-                offset_resample(1,0) = offset(1,0)-(int)offset(1,0);
-                offset(0,0) = (float)((int)offset(0,0));
-                offset(1,0) = (float)((int)offset(1,0));
+                    offset_resample(0,0) = offset(0,0)-(int)offset(0,0);
+                    offset_resample(1,0) = offset(1,0)-(int)offset(1,0);
+                    offset(0,0) = (float)((int)offset(0,0));
+                    offset(1,0) = (float)((int)offset(1,0));*/
 
-                delete HRTransformed;
-                HRTransformed = new my_image_comp;
-                //int spacing = (int)pow(2, scaleDiff+MATCH_LEVELS-1);
-                //boundary = spacing*2+1;
-                boundary = 10*scaleDiff;
-                HRTransformed->init(HR->height, HR->width, boundary);
+                    scaleTransform(transform_offset, waveletLevels, &transform, &offset_resample, &offset, &scaleDiff);
+
+                    delete HRTransformed;
+                    HRTransformed = new my_image_comp;
+                    //int spacing = (int)pow(2, scaleDiff+MATCH_LEVELS-1);
+                    //boundary = spacing*2+1;
+                    boundary = 2*256+1;
+                    HRTransformed->init(HR->height, HR->width, boundary);
 
 
-                for(int r = 0; r < HR->height; r++){
-                    for(int c = 0; c < HR->width; c++){
-                        assert(HR->buf[r*HR->stride+c] >= -1);
-                        assert(HR->buf[r*HR->stride+c] < 1);
+                    for(int r = 0; r < HR->height; r++){
+                        for(int c = 0; c < HR->width; c++){
+                            assert(HR->buf[r*HR->stride+c] >= -1);
+                            assert(HR->buf[r*HR->stride+c] < 1);
+                        }
                     }
-                }
-                cout << transform << endl;
-                cout << offset_resample << endl;
-                resampleImage(HR, HRTransformed, transform, offset_resample);
-                double matchQuality = getMatchMetric(LR, HRTransformed, offset, scaleDiff);
+                    cout << transform << endl;
+                    cout << offset_resample << endl;
+                    resampleImage(HR, HRTransformed, transform, offset_resample);
+                    double matchQuality = getMatchMetric(LR, HRTransformed, offset, scaleDiff);
 
-                printf("new mse = %f, best mse = %f\n", matchQuality, bestMatchQuality);
+                    printf("new mse = %f, best mse = %f\n", matchQuality, bestMatchQuality);
 
-                if(matchQuality < bestMatchQuality){
-                    //restart looking into coordinates
-                    i = 0;
-                    j = -1;
-                    diff = 1;
-                    bestMatchQuality = matchQuality;
-                } else {
-                    transform_offset(i, j) -= diff;
+                    if(matchQuality < tempBestMatchQuality){
+                        //restart looking into coordinates
+                        i = 0;
+                        //j = -1;
+                        //diff_x = 2;
+                        //diff_y = 2;
+                        /*diff[0] = -1;
+                        for(int i = 1; i < 6; i++){
+                            diff[i] = 2;
+                        }*/
+                        tempBestMatchQuality = matchQuality;
+                        for (int k = 0; k < 6; ++k){
+                            tempHRpoints[k] = HRpoints[k];
+                        }
+                    } else {
+                        //transform_offset(i, j) -= diff;
+                        HRpoints[i] -= diff_x;
+                        HRpoints[i+1] -= diff_y;
+                        /*for(int i = 0; i < 6; i++){
+                            HRpoints[i] += diff[i];
+                        }*/
+                    }
+                        //}
+                    //}
                 }
             }
         }
+        bestMatchQuality = tempBestMatchQuality;
+        for (int k = 0; k < 6; ++k){
+            HRpoints[k] = tempHRpoints[k];
+        }
     }
+    printf("==========Matched Points==============\n");
+    printf("                 LR                   \n");
+    for (int i = 0; i < 6; ++i){
+        printf("%f ", LRpoints[i]);
+    }
+    printf("\n");
+    printf("                 HR                   \n");
+    for (int i = 0; i < 6; ++i){
+        printf("%f ", HRpoints[i]);
+    }
+    printf("\n");
+    printf("======================================\n");
     delete HRTransformed;
     return transform_offset;
 }
@@ -151,6 +218,71 @@ Mat<float> computeAffineTransform(float *LRpoints, float *HRpoints){
     }
 
     return LRmatrix*inv(HRmatrix);
+}
+
+void scaleTransform(Mat<float> transform_input, int waveletLevels, Mat<float> *sTransform, Mat<float> *HRoffset, Mat<float> *LRoffset, int *scaleDiff){
+    assert(transform_input.n_rows == 2);
+    assert(transform_input.n_cols == 3);
+
+    (*sTransform) = transform_input.submat(0, 0, 1, 1);
+
+    Mat<float> tinv = inv((*sTransform));
+
+    Mat<float> *corners = new Mat<float>[4];
+    for(int i = 0; i < 4; i++){
+        corners[i].resize(2, 1);
+    }
+    corners[0](0,0) =  PI;
+    corners[0](1,0) =  PI;
+    corners[1](0,0) =  PI;
+    corners[1](1,0) = -PI;
+    corners[2](0,0) = -PI;
+    corners[2](1,0) =  PI;
+    corners[3](0,0) = -PI;
+    corners[3](1,0) = -PI;
+
+    float maxCorner = PI;
+
+    for(int i = 0; i < 4; i++){
+        Mat<float> outCorner = tinv*corners[i];
+        maxCorner = max(maxCorner, abs(outCorner(0,0)));
+        maxCorner = max(maxCorner, abs(outCorner(1,0)));
+    }
+
+    maxCorner /= PI;
+
+    //printf("MaxCorner = %f\n", maxCorner);
+
+    *scaleDiff = pow(2, (int)(log2(maxCorner)+0.5));
+    int levelDiff = log2(*scaleDiff);
+
+    float sx = 1.0/sqrt((*sTransform)(0,0)*(*sTransform)(0,0) + (*sTransform)(1,0)*(*sTransform)(1,0));
+    float sy = 1.0/sqrt((*sTransform)(0,1)*(*sTransform)(0,1) + (*sTransform)(1,1)*(*sTransform)(1,1));
+
+    printf("sd = %d, sx = %f, sy = %f\n", (*scaleDiff), sx, sy);
+    Mat<float> scaleT(2,2);
+    scaleT(0,0) = sx*sx/(*scaleDiff);
+    scaleT(0,1) = 0;
+    scaleT(1,0) = 0;
+    scaleT(1,1) = sy*sy/(*scaleDiff);
+
+    (*LRoffset) = transform_input.submat(0, 2, 1, 2);
+
+    (*HRoffset)(0,0) = (*LRoffset)(0,0)-(int)(*LRoffset)(0,0);
+    (*HRoffset)(1,0) = (*LRoffset)(1,0)-(int)(*LRoffset)(1,0);
+    (*LRoffset)(0,0) = (float)((int)(*LRoffset)(0,0));
+    (*LRoffset)(1,0) = (float)((int)(*LRoffset)(1,0));
+
+    (*HRoffset)(0,0) += (int)(*LRoffset)(0,0)%(int)pow(2, waveletLevels-levelDiff);
+    (*HRoffset)(1,0) += (int)(*LRoffset)(1,0)%(int)pow(2, waveletLevels-levelDiff);
+
+    //offset_resample *= -1;
+
+    (*LRoffset)(0,0) -= (int)(*LRoffset)(0,0)%(int)pow(2, waveletLevels-levelDiff);
+    (*LRoffset)(1,0) -= (int)(*LRoffset)(1,0)%(int)pow(2, waveletLevels-levelDiff);
+
+    (*sTransform) = (*sTransform)*scaleT;
+    (*HRoffset) = scaleT*(*HRoffset);
 }
 
 Mat<float> scaleTransform(Mat<float> transform, int *scaleDiff){
@@ -186,12 +318,23 @@ Mat<float> scaleTransform(Mat<float> transform, int *scaleDiff){
 
     *scaleDiff = pow(2, (int)(log2(maxCorner)+0.5));
 
+    float sx = 1.0/sqrt(transform(0,0)*transform(0,0) + transform(1,0)*transform(1,0));
+    float sy = 1.0/sqrt(transform(0,1)*transform(0,1) + transform(1,1)*transform(1,1));
+
+    printf("sd = %d, sx = %f, sy = %f\n", (*scaleDiff), sx, sy);
+    Mat<float> scaleT(2,2);
+    scaleT(0,0) = sx*sx/(*scaleDiff);
+    scaleT(0,1) = 0;
+    scaleT(1,0) = 0;
+    scaleT(1,1) = sy*sy/(*scaleDiff);
+
     //printf("end of scaling function:, scaleDiff = %d, maxCorner = %f\n", *scaleDiff, maxCorner);
     //cout << transform << endl; 
     //cout << (1.0/(float)(*scaleDiff))*transform << endl; 
     delete[] corners;
     //return ((maxCorner*maxCorner)/(float)(*scaleDiff))*transform;
-    return (1.0/(float)*scaleDiff)*tinv;
+    //return (1.0/(float)*scaleDiff)*tinv;
+    return transform*scaleT;
 }
 
 int resampleImage(char* inputFile, char* outputFile, arma::Mat<float> transform){
@@ -284,8 +427,9 @@ void resampleImage(my_image_comp *in, my_image_comp *out, Mat<float> transform, 
 
 double getMatchMetric(my_image_comp *LR, my_image_comp *HR, Mat<float> offset, int scaleDiff){
     //return getMetric_Intensity(LR, HR, offset, scaleDiff);
-    return getMetric_Wavelet(LR, HR, offset, scaleDiff);
+    //return getMetric_Wavelet(LR, HR, offset, scaleDiff);
     //return getMetric_Wavelet2(LR, HR, offset, scaleDiff);
+    return getMetric_MultipleWavelet(LR, HR, offset, scaleDiff, 6);
 }
 
 double getMetric_Intensity(my_image_comp *LR, my_image_comp *HR, Mat<float> offset, int scaleDiff){
@@ -398,6 +542,61 @@ double getMetric_Wavelet2(my_image_comp *LR, my_image_comp *HR, Mat<float> offse
     delete LR_offset_wavelet;
     delete HR_wavelet;
     return mse/numPixels;
+}
+
+double getMetric_MultipleWavelet(my_image_comp *LR, my_image_comp *HR, Mat<float> offset, int scaleDiff, int levels){
+    my_image_comp *LR_offset = new my_image_comp;
+    LR_offset->init((HR->height)/scaleDiff, (HR->width)/scaleDiff, 2*pow(2,levels)+1);
+    for(int r = 0; r < LR_offset->height; r++){
+        for(int c = 0; c < LR_offset->width; c++){
+            LR_offset->buf[r*LR_offset->stride+c] = LR->buf[(r+(int)offset(1,0))*LR->stride+(c+(int)offset(0,0))];
+        }
+    }
+
+    Mat<float> analysis_offset(2,1);
+    analysis_offset(0,0) = 0;
+    analysis_offset(1,0) = 0;
+
+    my_image_comp *LR_offset_wavelet = new my_image_comp;
+    LR_offset_wavelet->init(LR_offset->height, LR_offset->width, 0);
+
+    analysis_5_3(LR_offset, LR_offset_wavelet, levels, analysis_offset);
+    delete LR_offset;
+
+    my_image_comp *HR_wavelet = new my_image_comp;
+    HR_wavelet->init(HR->height, HR->width, 0);
+
+    analysis_5_3(HR, HR_wavelet, log2(scaleDiff)+levels, analysis_offset);
+
+    double mse[levels-2] = {0.0};
+    int numPixels[levels-2] = {0};
+
+    int LR_spacing = (int)pow(2, levels);
+    for(int r = 0; r < LR_offset_wavelet->height; r++){
+        for(int c = 0; c < LR_offset_wavelet->width; c++){
+            for(int l = 0; l < levels-2; l++){
+                if((HR_wavelet->buf[r*scaleDiff*HR_wavelet->stride+c*scaleDiff] != INVALID && LR_offset_wavelet->buf[r*LR_offset_wavelet->stride+c] != INVALID)){
+                    //0 level: thing % lrspacing, values that are r == 1 && c <= 1, 
+                    //1 level: thing % lrspacing, values that are r == 2, 3 && c <= 3
+                    //n level: thing % lrspacing, values that are r >= 2^n, r < 2^n+1 && c < 2^n+1
+                    if((r%LR_spacing >= pow(2, l) && r%LR_spacing < pow(2, l+1) && c%LR_spacing < pow(2, l+1)) || 
+                       (c%LR_spacing >= pow(2, l) && c%LR_spacing < pow(2, l+1) && r%LR_spacing < pow(2, l+1))){
+                        double err = LR_offset_wavelet->buf[r*LR_offset_wavelet->stride+c] - HR_wavelet->buf[r*scaleDiff*HR_wavelet->stride+c*scaleDiff];
+                        mse[l] += err*err;
+                        numPixels[l]++;
+                        //printf("r = %d, c = %d, err = %f, mse = %f\n", r, c, err, mse);
+                    }
+                }
+            }
+        }
+    }
+    double metric = 0.0;
+    delete LR_offset_wavelet;
+    delete HR_wavelet;
+    for(int l = 0; l < levels-2; l++){
+        metric += pow(5, l)*(mse[l]/numPixels[l]);
+    }
+    return metric;
 }
 
 /*

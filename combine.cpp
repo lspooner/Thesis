@@ -13,6 +13,7 @@
 
 void combineWavelets(my_image_comp *inLR, my_image_comp *inHR, my_image_comp *out, int LRspacing, int method, int Roffset, int Coffset);
 void maxValueCombination(my_image_comp *inLR, my_image_comp *inHR, my_image_comp *out, int LRspacing, int Roffset, int Coffset);
+void getLuminance(my_image_comp *in, my_image_comp *out);
 
 int combineImages(char* LRinputFile, char* HRinputFile, char* outputFile, int waveletType, int combineType){
     // Read the input images
@@ -31,6 +32,9 @@ int combineImages(char* LRinputFile, char* HRinputFile, char* outputFile, int wa
     }
     printf("Read in HR image\n");
 
+    int LRwidth = input_comps_LR[0].width, LRheight = input_comps_LR[0].height;
+    int HRwidth = input_comps_HR[0].width, HRheight = input_comps_HR[0].height;
+
     /*printf("Enter LR coordinates: ");
     float LRpoints[6];
     assert(scanf("%f %f %f %f %f %f", (&LRpoints[0]), (&LRpoints[1]), (&LRpoints[2]), (&LRpoints[3]), (&LRpoints[4]), (&LRpoints[5])) == 6);
@@ -39,8 +43,41 @@ int combineImages(char* LRinputFile, char* HRinputFile, char* outputFile, int wa
     float HRpoints[6];
     assert(scanf("%f %f %f %f %f %f", (&HRpoints[0]), (&HRpoints[1]), (&HRpoints[2]), (&HRpoints[3]), (&HRpoints[4]), (&HRpoints[5])) == 6);*/
 
-    float LRpoints[6] = {1337, 955, 2047, 939, 1919, 1484};
-    float HRpoints[6] = {764, 413, 3077, 353, 2666, 2132};
+    //noteboard
+    //float LRpoints[6] = {1337, 955, 2047, 939, 1919, 1484};
+    //float HRpoints[6] = {764, 413, 3077, 353, 2666, 2132};
+    float LRpoints[6] = {1345, 959, 2055, 943, 1927, 1488};
+    float HRpoints[6] = {764, 413, 3070, 353, 2670, 2136};
+
+    //1345.000000 959.000000 2055.000000 943.000000 1927.000000 1488.000000 
+    //763.500000 413.000000 3074.000000 353.000000 2669.500000 2136.000000 
+
+
+    //float LRpoints[6] = {1571, 1339, 1815, 874, 1239, 1356};
+    //float HRpoints[6] = {1532, 1658, 2320, 142, 450, 1720};
+
+    //float LRpoints[6] = {1571.19, 1339.3, 1618.92, 1093.47, 1815.09, 874.113};
+    //float HRpoints[6] = {1532.19, 1657.67, 1683.03, 862.294, 2320.36, 141.963};
+
+/*
+-- Good Match [0] Keypoint 1: [1532.19, 1657.67] Keypoint 2: [1571.19, 1339.3]
+-- Good Match [1] Keypoint 1: [1683.03, 862.294] Keypoint 2: [1618.92, 1093.47]
+-- Good Match [2] Keypoint 1: [2320.36, 141.963] Keypoint 2: [1815.09, 874.113]
+
+---- Good Match [0] Keypoint 1: [1532.19, 1657.67] Keypoint 2: [1571.19, 1339.3]
+-- Good Match [1] Keypoint 1: [1683.03, 862.294] Keypoint 2: [1618.92, 1093.47]
+---- Good Match [2] Keypoint 1: [2320.36, 141.963] Keypoint 2: [1815.09, 874.113]
+---- Good Match [3] Keypoint 1: [449.823, 1719.87] Keypoint 2: [1238.89, 1356.32]
+-- Good Match [4] Keypoint 1: [1694.43, 257.949] Keypoint 2: [1622.91, 908.82]
+-- Good Match [5] Keypoint 1: [1963.79, 969.275] Keypoint 2: [1707.59, 1067.16]
+-- Good Match [6] Keypoint 1: [1736.52, 565.579] Keypoint 2: [1635.58, 1002.47]
+-- Good Match [7] Keypoint 1: [1991.23, 197.346] Keypoint 2: [1635.58, 1002.47]
+*/
+
+
+    //bookshelf
+    //float LRpoints[6] = {1442, 1117, 1861, 1094, 1786, 1369};
+    //float HRpoints[6] = {112, 628, 2983, 502, 2457, 2381};
 
     //TODO: work out borders!!!
 
@@ -48,24 +85,49 @@ int combineImages(char* LRinputFile, char* HRinputFile, char* outputFile, int wa
     //hence find scale between images
     //scale hardcoded and transform assumed to be I for now
 
-    Mat<float> transform_offset = matchImages(input_comps_LR, input_comps_HR, LRpoints, HRpoints);
-    //Mat<float> transform_offset = computeAffineTransform(LRpoints, HRpoints);
+    Mat<float> transform_offset;
+
+    if(num_comps == 3){
+        my_image_comp *LR_luminance = new my_image_comp;
+        LR_luminance->init(LRheight, LRwidth, 0);
+        getLuminance(input_comps_LR, LR_luminance);
+        assert(outputBMP((char*)"images/LR_luminance.bmp", LR_luminance, 1) == 0);
+
+        my_image_comp *HR_luminance = new my_image_comp;
+        HR_luminance->init(HRheight, HRwidth, 2);
+        getLuminance(input_comps_HR, HR_luminance);
+        assert(outputBMP((char*)"images/HR_luminance.bmp", HR_luminance, 1) == 0);
+
+        transform_offset = matchImages(LR_luminance, HR_luminance, LRpoints, HRpoints);
+    } else {
+        transform_offset = matchImages(input_comps_LR, input_comps_HR, LRpoints, HRpoints);
+    }
+
+    transform_offset = computeAffineTransform(LRpoints, HRpoints);
 
 
     /*monument match
        1.6102e-01   2.5884e-03   1.9040e+03
-  -3.2612e-03   1.6129e-01   1.4617e+03
+  -3.2612e-03   1.6129e-01   1.4617e+03*/
+
+    /*noteboard match
+    [0.3155647850225765, -0.0002451978272692557, 1088.04861934722;
+    -0.178128803497289, 0.283625685752317, 1144.337763792789]
+
+    [0.3054285682198384, -0.002093241794122846, 1106.683261008859;
+    0.006549088440108208, 0.3103152772793613, 814.8630937837338]
+    */
 
 
-    Mat<float> transform_offset(2, 3);
-    transform_offset(0,0) = 0.16102;
-    transform_offset(0,1) = 0.0025884;
-    transform_offset(0,2) = 1904.0;
-    transform_offset(1,0) = -0.0032612;
-    transform_offset(1,1) = 0.16129;
-    transform_offset(1,2) = 1461.7;*/
+    /*Mat<float> transform_offset(2, 3);
+    transform_offset(0,0) = 0.3054285682198384;
+    transform_offset(0,1) = -0.002093241794122846;
+    transform_offset(0,2) = 1106.683261008859;
+    transform_offset(1,0) = 0.006549088440108208;
+    transform_offset(1,1) = 0.3103152772793613;
+    transform_offset(1,2) = 814.8630937837338;*/
 
-    Mat<float> transform = transform_offset.submat(0, 0, 1, 1);
+    /*Mat<float> transform = transform_offset.submat(0, 0, 1, 1);
     Mat<float> offset = transform_offset.submat(0, 2, 1, 2);
     int scaleDiff;
     transform = scaleTransform(transform, &scaleDiff);
@@ -79,21 +141,32 @@ int combineImages(char* LRinputFile, char* HRinputFile, char* outputFile, int wa
     offset(0,0) = (float)((int)offset(0,0));
     offset(1,0) = (float)((int)offset(1,0));
 
-    offset_resample(0,0) += (int)offset(0,0)%(int)pow(2, waveletLevels-levelDiff);
-    offset_resample(1,0) += (int)offset(1,0)%(int)pow(2, waveletLevels-levelDiff);
+    offset_resample(0,0) += scaleDiff*((int)offset(0,0)%(int)pow(2, waveletLevels-levelDiff));
+    offset_resample(1,0) += scaleDiff*((int)offset(1,0)%(int)pow(2, waveletLevels-levelDiff));
 
-    offset_resample *= -1;
+    //offset_resample *= -1;
 
     offset(0,0) -= (int)offset(0,0)%(int)pow(2, waveletLevels-levelDiff);
-    offset(1,0) -= (int)offset(1,0)%(int)pow(2, waveletLevels-levelDiff);
+    offset(1,0) -= (int)offset(1,0)%(int)pow(2, waveletLevels-levelDiff);*/
+
+    Mat<float> transform(2,2);
+    Mat<float> offset_resample(2,1);
+    Mat<float> offset(2,1);
+    int scaleDiff;
+
+    scaleTransform(transform_offset, waveletLevels, &transform, &offset_resample, &offset, &scaleDiff);
+
+    int levelDiff = log2(scaleDiff);
+
+    //offset(0,0) = 1108.0;
+    //offset(1,0) = 828.0;
+
 
     printf("scaleDiff = %d, levelDiff = %d\n", scaleDiff, levelDiff);
     cout << transform << endl;
     cout << offset_resample << endl;
     cout << offset << endl;
 
-    int LRwidth = input_comps_LR[0].width, LRheight = input_comps_LR[0].height;
-    int HRwidth = input_comps_HR[0].width, HRheight = input_comps_HR[0].height;
     int Outwidth = LRwidth*scaleDiff, Outheight = LRheight*scaleDiff;
 
     my_image_comp *output_comps = new my_image_comp[num_comps];
@@ -234,6 +307,31 @@ void maxValueCombination(my_image_comp *inLR, my_image_comp *inHR, my_image_comp
                     out->buf[r*out->stride+c] = maxVal;//inHR->buf[(r-Roffset)*inHR->stride+(c-Coffset)];
                 }
             }
+        }
+    }
+}
+
+void getLuminance(my_image_comp *in, my_image_comp *out){
+    Mat<float> colourMatrix(3,3);
+    colourMatrix(0,0) = 0.299;
+    colourMatrix(0,1) = 0.587;
+    colourMatrix(0,2) = 0.114;
+    colourMatrix(1,0) = -0.169;
+    colourMatrix(1,1) = -0.331;
+    colourMatrix(1,2) = 0.500;
+    colourMatrix(2,0) = 0.500;
+    colourMatrix(2,1) = -0.419;
+    colourMatrix(2,2) = -0.081;
+
+    for(int r = 0; r < out->height; r++){
+        for(int c = 0; c < out->width; c++){
+            Mat<float> RGB(3,1);
+            RGB(0,0) = in[0].buf[r*in[0].stride+c];
+            RGB(1,0) = in[1].buf[r*in[1].stride+c];
+            RGB(2,0) = in[2].buf[r*in[2].stride+c];
+
+            Mat<float> YCbCr = colourMatrix*RGB;
+            out->buf[r*out->stride+c] = YCbCr(0,0);
         }
     }
 }
