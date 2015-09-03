@@ -25,10 +25,10 @@ int synthesis_5_3(char* inputFile, char* outputFile, int levels);
 int synthesis_9_7(char* inputFile, char* outputFile, int levels);
 int increaseWaveletLevel(char* inputFile, char* outputFile, int scale);
 
-void analysis_5_3(my_image_comp *in, my_image_comp *out, int levels, Mat<float> offset);
-void analysis_9_7(my_image_comp *in, my_image_comp *out, int levels, Mat<float> offset);
-void synthesis_5_3(my_image_comp *in, my_image_comp *out, int levels, Mat<float> offset);
-void synthesis_9_7(my_image_comp *in, my_image_comp *out, int levels, Mat<float> offset);
+void analysis_5_3(my_image_comp *in, my_image_comp *out, int levels);
+void analysis_9_7(my_image_comp *in, my_image_comp *out, int levels);
+void synthesis_5_3(my_image_comp *in, my_image_comp *out, int levels);
+void synthesis_9_7(my_image_comp *in, my_image_comp *out, int levels);
 void increaseWaveletLevel(my_image_comp *in, my_image_comp *out, int scale);
 
 #endif //WAVELET_H

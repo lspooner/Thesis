@@ -19,15 +19,15 @@ using namespace arma;
 #define HL_S97_HP 4
 
 int analysis_5_3(char* inputFile, char* outputFile, int levels);
-void analysis_5_3(my_image_comp *in, my_image_comp *out, int levels, Mat<float> offset);
+void analysis_5_3(my_image_comp *in, my_image_comp *out, int levels);
 int analysis_9_7(char* inputFile, char* outputFile, int levels);
-void analysis_9_7(my_image_comp *in, my_image_comp *out, int levels, Mat<float> offset);
+void analysis_9_7(my_image_comp *in, my_image_comp *out, int levels);
 int synthesis_5_3(char* inputFile, char* outputFile, int levels);
-void synthesis_5_3(my_image_comp *in, my_image_comp *out, int levels, Mat<float> offset);
+void synthesis_5_3(my_image_comp *in, my_image_comp *out, int levels);
 int synthesis_9_7(char* inputFile, char* outputFile, int levels);
-void synthesis_9_7(my_image_comp *in, my_image_comp *out, int levels, Mat<float> offset);
-void analysis(my_image_comp *in, my_image_comp *out, int spacing, Mat<float> offset, float* LPfilter, float* HPfilter, int LP_HL, int HP_HL);
-void synthesis(my_image_comp *in, my_image_comp *out, int spacing, Mat<float> offset, float* LPfilter, float* HPfilter, int LP_HL, int HP_HL);
+void synthesis_9_7(my_image_comp *in, my_image_comp *out, int levels);
+void analysis(my_image_comp *in, my_image_comp *out, int spacing, float* LPfilter, float* HPfilter, int LP_HL, int HP_HL);
+void synthesis(my_image_comp *in, my_image_comp *out, int spacing, float* LPfilter, float* HPfilter, int LP_HL, int HP_HL);
 int increaseWaveletLevel(char* inputFile, char* outputFile, int levels);
 void increaseWaveletLevel(my_image_comp *in, my_image_comp *out, int scale);
 void copyBuffer(my_image_comp *copyFrom, my_image_comp *copyTo);
