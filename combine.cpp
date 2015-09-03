@@ -13,6 +13,10 @@
 
 void combineWavelets(my_image_comp *inLR, my_image_comp *inHR, my_image_comp *out, int LRspacing, int method, int Roffset, int Coffset);
 void maxValueCombination(my_image_comp *inLR, my_image_comp *inHR, my_image_comp *out, int LRspacing, int Roffset, int Coffset);
+void maxValueCombinationRetainLR(my_image_comp *inLR, my_image_comp *inHR, my_image_comp *out, int LRspacing, int Roffset, int Coffset);
+void maxValueCombinationAverageLR(my_image_comp *inLR, my_image_comp *inHR, my_image_comp *out, int LRspacing, int Roffset, int Coffset);
+void maxValueCombinationBlendLR(my_image_comp *inLR, my_image_comp *inHR, my_image_comp *out, int LRspacing, int Roffset, int Coffset);
+void allBlendCombination(my_image_comp *inLR, my_image_comp *inHR, my_image_comp *out, int LRspacing, int Roffset, int Coffset);
 void getLuminance(my_image_comp *in, my_image_comp *out);
 void getHRinfo(my_image_comp *image, Mat<float> offset, int scaleDiff, int height, int width, float* HRinfo);
 void getDiscontinuities(my_image_comp *image, Mat<float> offset, int height, int width, float* discontinuities);
@@ -48,9 +52,9 @@ int combineImages(char* LRinputFile, char* HRinputFile, char* outputFile, int wa
     //noteboard
     //float LRpoints[6] = {1337, 955, 2047, 939, 1919, 1484};
     //float HRpoints[6] = {764, 413, 3077, 353, 2666, 2132};
-    //float LRpoints[6] = {1345, 959, 2055, 943, 1927, 1488};
+    float LRpoints[6] = {1345, 959, 2055, 943, 1927, 1488};
     //float HRpoints[6] = {764, 413, 3070, 353, 2670, 2136};
-    //float HRpoints[6] = {763.5, 413, 3074, 353, 2669.5, 2136};
+    float HRpoints[6] = {763.5, 413, 3074, 353, 2669.5, 2136};
 
 
     //1345.000000 959.000000 2055.000000 943.000000 1927.000000 1488.000000 
@@ -80,8 +84,8 @@ int combineImages(char* LRinputFile, char* HRinputFile, char* outputFile, int wa
 
 
     //bookshelf
-    float LRpoints[6] = {1442, 1117, 1861, 1094, 1786, 1369};
-    float HRpoints[6] = {112, 628, 2983, 502, 2457, 2381};
+    //float LRpoints[6] = {1442, 1117, 1861, 1094, 1786, 1369};
+    //float HRpoints[6] = {112, 628, 2983, 502, 2457, 2381};
 
     //TODO: work out borders!!!
 
@@ -299,6 +303,14 @@ void combineWavelets(my_image_comp *inLR, my_image_comp *inHR, my_image_comp *ou
 
     if(method == MAX_VALUE){
         maxValueCombination(inLR, inHR, out, LRspacing, Roffset, Coffset);
+    } else if(method == MAX_VALUE_RETAIN_LR){
+        maxValueCombinationRetainLR(inLR, inHR, out, LRspacing, Roffset, Coffset);
+    } else if(method == MAX_VALUE_AVERAGE_LR){
+        maxValueCombinationAverageLR(inLR, inHR, out, LRspacing, Roffset, Coffset);
+    } else if(method == MAX_VALUE_BLEND_LR){
+        maxValueCombinationBlendLR(inLR, inHR, out, LRspacing, Roffset, Coffset);
+    } else if(method == BLEND_ALL){
+        allBlendCombination(inLR, inHR, out, LRspacing, Roffset, Coffset);
     }
 }
 
@@ -323,6 +335,131 @@ void maxValueCombination(my_image_comp *inLR, my_image_comp *inHR, my_image_comp
                         maxVal *= -1;
                     }
                     out->buf[r*out->stride+c] = maxVal;//inHR->buf[(r-Roffset)*inHR->stride+(c-Coffset)];
+                }
+            }
+        }
+    }
+}
+
+void maxValueCombinationRetainLR(my_image_comp *inLR, my_image_comp *inHR, my_image_comp *out, int LRspacing, int Roffset, int Coffset){
+    int Roffset_high = Roffset+inHR->height;
+    int Coffset_high = Coffset+inHR->width;
+
+    for(int r = 0; r < out->height; r++){
+        for(int c = 0; c < out->width; c++){
+            if(r < Roffset || r >= Roffset_high || c < Coffset || c >= Coffset_high ){
+                if(r%LRspacing == 0 && c%LRspacing == 0){
+                    out->buf[r*out->stride+c] = inLR->buf[r*inLR->stride+c];
+                } else {
+                    out->buf[r*out->stride+c] = 0;
+                }
+            } else {
+                if(inHR->buf[(r-Roffset)*inHR->stride+(c-Coffset)] == INVALID || (r%LRspacing == 0 && c%LRspacing == 0)){
+                     out->buf[r*out->stride+c] = inLR->buf[r*inLR->stride+c];
+                } else {
+                    float maxVal = max(abs(inLR->buf[r*inLR->stride+c]), abs(inHR->buf[(r-Roffset)*inHR->stride+(c-Coffset)]));
+                    if(maxVal != inLR->buf[r*inLR->stride+c] && maxVal != inHR->buf[(r-Roffset)*inHR->stride+(c-Coffset)]){
+                        maxVal *= -1;
+                    }
+                    out->buf[r*out->stride+c] = maxVal;//inHR->buf[(r-Roffset)*inHR->stride+(c-Coffset)];
+                }
+            }
+        }
+    }
+}
+
+void maxValueCombinationBlendLR(my_image_comp *inLR, my_image_comp *inHR, my_image_comp *out, int LRspacing, int Roffset, int Coffset){
+    int Roffset_high = Roffset+inHR->height;
+    int Coffset_high = Coffset+inHR->width;
+
+    int blendBoundary = 20;
+
+    for(int r = 0; r < out->height; r++){
+        for(int c = 0; c < out->width; c++){
+            if(r < Roffset || r >= Roffset_high || c < Coffset || c >= Coffset_high ){
+                if(r%LRspacing == 0 && c%LRspacing == 0){
+                    out->buf[r*out->stride+c] = inLR->buf[r*inLR->stride+c];
+                } else {
+                    out->buf[r*out->stride+c] = 0;
+                }
+            } else {
+                if(inHR->buf[(r-Roffset)*inHR->stride+(c-Coffset)] == INVALID){
+                    out->buf[r*out->stride+c] = inLR->buf[r*inLR->stride+c];
+                } else if(r%LRspacing == 0 && c%LRspacing == 0){
+                    if((r + blendBoundary*LRspacing < Roffset_high && r - blendBoundary*LRspacing > Roffset) && (c + blendBoundary*LRspacing < Coffset_high && c - blendBoundary*LRspacing > Coffset)){
+                        out->buf[r*out->stride+c] = inHR->buf[(r-Roffset)*inHR->stride+(c-Coffset)];
+                    } else {
+                        float scaleR = min(((float)(r-Roffset)/(float)LRspacing)/(float)blendBoundary, ((float)(Roffset_high-r)/(float)LRspacing)/(float)blendBoundary);
+                        float scaleC = min(((float)(c-Coffset)/(float)LRspacing)/(float)blendBoundary, ((float)(Coffset_high-c)/(float)LRspacing)/(float)blendBoundary);
+                        float scale = min(scaleR, scaleC);
+                        out->buf[r*out->stride+c] = (1-scale)*inLR->buf[r*inLR->stride+c] + scale*inHR->buf[(r-Roffset)*inHR->stride+(c-Coffset)];
+                    }
+                } else {
+                    float maxVal = max(abs(inLR->buf[r*inLR->stride+c]), abs(inHR->buf[(r-Roffset)*inHR->stride+(c-Coffset)]));
+                    if(maxVal != inLR->buf[r*inLR->stride+c] && maxVal != inHR->buf[(r-Roffset)*inHR->stride+(c-Coffset)]){
+                        maxVal *= -1;
+                    }
+                    out->buf[r*out->stride+c] = maxVal;//inHR->buf[(r-Roffset)*inHR->stride+(c-Coffset)];
+                }
+            }
+        }
+    }
+}
+
+
+void maxValueCombinationAverageLR(my_image_comp *inLR, my_image_comp *inHR, my_image_comp *out, int LRspacing, int Roffset, int Coffset){
+    int Roffset_high = Roffset+inHR->height;
+    int Coffset_high = Coffset+inHR->width;
+
+    for(int r = 0; r < out->height; r++){
+        for(int c = 0; c < out->width; c++){
+            if(r < Roffset || r >= Roffset_high || c < Coffset || c >= Coffset_high ){
+                if(r%LRspacing == 0 && c%LRspacing == 0){
+                    out->buf[r*out->stride+c] = inLR->buf[r*inLR->stride+c];
+                } else {
+                    out->buf[r*out->stride+c] = 0;
+                }
+            } else {
+                if(inHR->buf[(r-Roffset)*inHR->stride+(c-Coffset)] == INVALID){
+                    out->buf[r*out->stride+c] = inLR->buf[r*inLR->stride+c];
+                } else if(r%LRspacing == 0 && c%LRspacing == 0){
+                    out->buf[r*out->stride+c] = (inLR->buf[r*inLR->stride+c]+inHR->buf[(r-Roffset)*inHR->stride+(c-Coffset)])/2.0;
+                } else {
+                    float maxVal = max(abs(inLR->buf[r*inLR->stride+c]), abs(inHR->buf[(r-Roffset)*inHR->stride+(c-Coffset)]));
+                    if(maxVal != inLR->buf[r*inLR->stride+c] && maxVal != inHR->buf[(r-Roffset)*inHR->stride+(c-Coffset)]){
+                        maxVal *= -1;
+                    }
+                    out->buf[r*out->stride+c] = maxVal;//inHR->buf[(r-Roffset)*inHR->stride+(c-Coffset)];
+                }
+            }
+        }
+    }
+}
+
+void allBlendCombination(my_image_comp *inLR, my_image_comp *inHR, my_image_comp *out, int LRspacing, int Roffset, int Coffset){
+    int Roffset_high = Roffset+inHR->height;
+    int Coffset_high = Coffset+inHR->width;
+
+    int blendBoundary = 20;
+
+    for(int r = 0; r < out->height; r++){
+        for(int c = 0; c < out->width; c++){
+            if(r < Roffset || r >= Roffset_high || c < Coffset || c >= Coffset_high ){
+                if(r%LRspacing == 0 && c%LRspacing == 0){
+                    out->buf[r*out->stride+c] = inLR->buf[r*inLR->stride+c];
+                } else {
+                    out->buf[r*out->stride+c] = 0;
+                }
+            } else {
+                if(inHR->buf[(r-Roffset)*inHR->stride+(c-Coffset)] == INVALID){
+                    out->buf[r*out->stride+c] = inLR->buf[r*inLR->stride+c];
+                } else if((r + blendBoundary*LRspacing < Roffset_high && r - blendBoundary*LRspacing > Roffset) && (c + blendBoundary*LRspacing < Coffset_high && c - blendBoundary*LRspacing > Coffset)){
+                    out->buf[r*out->stride+c] = inHR->buf[(r-Roffset)*inHR->stride+(c-Coffset)];
+                } else {
+                    float scaleR = min(((float)(r-Roffset)/(float)LRspacing)/(float)blendBoundary, ((float)(Roffset_high-r)/(float)LRspacing)/(float)blendBoundary);
+                    float scaleC = min(((float)(c-Coffset)/(float)LRspacing)/(float)blendBoundary, ((float)(Coffset_high-c)/(float)LRspacing)/(float)blendBoundary);
+                    float scale = min(scaleR, scaleC);
+                    out->buf[r*out->stride+c] = (1-scale)*inLR->buf[r*inLR->stride+c] + scale*inHR->buf[(r-Roffset)*inHR->stride+(c-Coffset)];
                 }
             }
         }

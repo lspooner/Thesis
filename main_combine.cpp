@@ -78,5 +78,9 @@ void printUsage(char* fileName){
                     "       %s -cw <in LR bmp file> <in HR bmp file> <out bmp file> LRspacing combineType Roffset Coffset"
                     "\n"
                     "waveletType: 0 = CDF5/3, 1 = CDF9/7\n"
-                    "combineType: 0 = max coefficient\n", fileName, fileName);
+                    "combineType: 0 = max coefficient\n"
+                    "             1 = max coefficients, except LR\n"
+                    "             2 = max coefficients, average LR\n"
+                    "             3 = max coefficients, blend LR\n"
+                    "             4 = blend all coefficients\n", fileName, fileName);
 }
