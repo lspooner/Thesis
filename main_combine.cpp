@@ -19,18 +19,20 @@ void printUsage(char* fileName);
 
 int main(int argc, char *argv[]){
 
-    if((argc == 7 && strcmp(argv[1], "-ci") == 0) || (argc == 9 && strcmp(argv[1], "-cw")==0)){
+    if((argc == 8 && strcmp(argv[1], "-ci") == 0) || (argc == 9 && strcmp(argv[1], "-cw")==0)){
         
         int err_code=0;
         try {
-            if(argc == 7){
+            if(argc == 8){
                 int waveletType;
                 int combineType;
+                int waveletLevels;
 
                 sscanf(argv[5], "%d", &waveletType);
                 sscanf(argv[6], "%d", &combineType);
+                sscanf(argv[7], "%d", &waveletLevels);
 
-                if((err_code = combineImages(argv[2], argv[3], argv[4], waveletType, combineType))){
+                if((err_code = combineImages(argv[2], argv[3], argv[4], waveletType, combineType, waveletLevels))){
                     throw err_code;
                 }
             } else {
@@ -74,7 +76,7 @@ int main(int argc, char *argv[]){
 }
 
 void printUsage(char* fileName){
-    fprintf(stderr, "Usage: %s -ci <in LR bmp file> <in HR bmp file> <out bmp file> waveletType combineType\n"
+    fprintf(stderr, "Usage: %s -ci <in LR bmp file> <in HR bmp file> <out bmp file> waveletType combineType waveletLevels\n"
                     "       %s -cw <in LR bmp file> <in HR bmp file> <out bmp file> LRspacing combineType Roffset Coffset"
                     "\n"
                     "waveletType: 0 = CDF5/3, 1 = CDF9/7\n"

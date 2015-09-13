@@ -21,13 +21,13 @@ void getLuminance(my_image_comp *in, my_image_comp *out);
 void getHRinfo(my_image_comp *image, Mat<int> offset, int scaleDiff, int height, int width, float* HRinfo);
 void getDiscontinuities(my_image_comp *image, Mat<int> offset, int height, int width, float* discontinuities);
 
-int combineImages(char* LRinputFile, char* HRinputFile, char* outputFile, int waveletType, int combineType){
+int combineImages(char* LRinputFile, char* HRinputFile, char* outputFile, int waveletType, int combineType, int waveletLevels){
     // Read the input images
     int err_code;
     my_image_comp *input_comps_LR = NULL;
     my_image_comp *input_comps_HR = NULL;
     int num_comps;
-    int waveletLevels = 4;
+    //int waveletLevels = 4;
     //printf("about to read in images\n");
     if ((err_code = readBMP(LRinputFile, &input_comps_LR, HL_A97_LP*pow(2, waveletLevels)+HL_A97_HP, &num_comps)) != 0){
         return err_code;
@@ -62,7 +62,7 @@ int combineImages(char* LRinputFile, char* HRinputFile, char* outputFile, int wa
 
     Mat<float> transform_offset;
 
-    if(num_comps == 3){
+    /*if(num_comps == 3){
         my_image_comp *LR_luminance = new my_image_comp;
         LR_luminance->init(LRheight, LRwidth, 0);
         getLuminance(input_comps_LR, LR_luminance);
@@ -76,7 +76,7 @@ int combineImages(char* LRinputFile, char* HRinputFile, char* outputFile, int wa
         transform_offset = matchImages(LR_luminance, HR_luminance, LRpoints, HRpoints);
     } else {
         transform_offset = matchImages(input_comps_LR, input_comps_HR, LRpoints, HRpoints);
-    }
+    }*/
 
     transform_offset = computeAffineTransform(LRpoints, HRpoints);
 
@@ -161,7 +161,7 @@ int combineImages(char* LRinputFile, char* HRinputFile, char* outputFile, int wa
         totalDiscontinuities += discontinuities;
     }
 
-    printf("HRinfo = %f, discontinuities = %f\n", totalHRinfo, totalDiscontinuities);
+    printf("%d,%d,%f,%f\n", combineType, waveletLevels, totalHRinfo, totalDiscontinuities);
 
     // Write the image back out again
     if((err_code = outputBMP(outputFile, output_comps, num_comps)) != 0){
