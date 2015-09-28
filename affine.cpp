@@ -81,53 +81,47 @@ Mat<float> matchImages(my_image_comp *LR, my_image_comp *HR, float *LRpoints, fl
         tempHRpoints[i] = HRpoints[i];
     }
     float tempBestMatchQuality = bestMatchQuality;
-    for(int i = 0; i < 6; i+=2){
-        for(float diff_x = -0.5; diff_x <= 0.5; diff_x+=0.5){
-            for(float diff_y = -0.5; diff_y <= 0.5; diff_y+=0.5){
-                if(!(diff_x == 0 && diff_y == 0)){
-                    HRpoints[i] += diff_x;
-                    HRpoints[i+1] += diff_y;
-                    transform_offset = computeAffineTransform(LRpoints, HRpoints);
+    bool changed = true;
+    while(changed){
+        changed = false;
+        for(int i = 0; i < 6; i+=2){
+            for(float diff_x = -0.5; diff_x <= 0.5; diff_x+=0.5){
+                for(float diff_y = -0.5; diff_y <= 0.5; diff_y+=0.5){
+                    if(!(diff_x == 0 && diff_y == 0)){
+                        HRpoints[i] += diff_x;
+                        HRpoints[i+1] += diff_y;
+                        transform_offset = computeAffineTransform(LRpoints, HRpoints);
 
-                    scaleTransform(transform_offset, waveletLevels, &transform, &offset_resample, &offset, &scaleDiff);
+                        scaleTransform(transform_offset, waveletLevels, &transform, &offset_resample, &offset, &scaleDiff);
 
-                    delete HRTransformed;
-                    HRTransformed = new my_image_comp;
-                    boundary = 2*256+1; //TODO: work out boundary dynamically
-                    HRTransformed->init(HR->height, HR->width, boundary);
+                        delete HRTransformed;
+                        HRTransformed = new my_image_comp;
+                        boundary = 2*256+1; //TODO: work out boundary dynamically
+                        HRTransformed->init(HR->height, HR->width, boundary);
 
+                        //cout << transform << endl;
+                        //cout << offset_resample << endl;
+                        resampleImage(HR, HRTransformed, transform, offset_resample);
+                        double matchQuality = getMatchMetric(LR, HRTransformed, offset, scaleDiff);
 
-                    for(int r = 0; r < HR->height; r++){
-                        for(int c = 0; c < HR->width; c++){
-                            assert(HR->buf[r*HR->stride+c] >= -1);
-                            assert(HR->buf[r*HR->stride+c] < 1);
+                        //printf("new mse = %f, best mse = %f\n", matchQuality, bestMatchQuality);
+
+                        if(matchQuality < tempBestMatchQuality){
+                            changed = true;
+                            tempBestMatchQuality = matchQuality;
+                            for (int k = 0; k < 6; ++k){
+                                tempHRpoints[k] = HRpoints[k];
+                            }
                         }
-                    }
-
-                    //cout << transform << endl;
-                    //cout << offset_resample << endl;
-                    resampleImage(HR, HRTransformed, transform, offset_resample);
-                    double matchQuality = getMatchMetric(LR, HRTransformed, offset, scaleDiff);
-
-                    //printf("new mse = %f, best mse = %f\n", matchQuality, bestMatchQuality);
-
-                    if(matchQuality < tempBestMatchQuality){
-                        //restart looking into coordinates
-                        i = 0;
-                        tempBestMatchQuality = matchQuality;
-                        for (int k = 0; k < 6; ++k){
-                            tempHRpoints[k] = HRpoints[k];
-                        }
-                    } else {
                         HRpoints[i] -= diff_x;
                         HRpoints[i+1] -= diff_y;
                     }
                 }
             }
-        }
-        bestMatchQuality = tempBestMatchQuality;
-        for (int k = 0; k < 6; ++k){
-            HRpoints[k] = tempHRpoints[k];
+            bestMatchQuality = tempBestMatchQuality;
+            for (int k = 0; k < 6; ++k){
+                HRpoints[k] = tempHRpoints[k];
+            }
         }
     }
     /*printf("==========Matched Points==============\n");
@@ -212,19 +206,25 @@ void scaleTransform(Mat<float> transform_input, int waveletLevels, Mat<float> *s
 
     (*HRoffset) = transform_input.submat(0, 2, 1, 2);
 
+    //offset between LR image and HR image
     (*LRoffset)(0) = (int)(*HRoffset)(0);
     (*LRoffset)(1) = (int)(*HRoffset)(1);
+
+    //offset that HR image will be warped by
     (*HRoffset)(0) = (*HRoffset)(0)-(*LRoffset)(0);
     (*HRoffset)(1) = (*HRoffset)(1)-(*LRoffset)(1);
 
     (*HRoffset)(0) += (*LRoffset)(0)%(int)pow(2, waveletLevels-levelDiff);
     (*HRoffset)(1) += (*LRoffset)(1)%(int)pow(2, waveletLevels-levelDiff);
 
+    (*HRoffset)(0) *= -1;
+    (*HRoffset)(1) *= -1;
+
     (*LRoffset)(0) -= (*LRoffset)(0)%(int)pow(2, waveletLevels-levelDiff);
     (*LRoffset)(1) -= (*LRoffset)(1)%(int)pow(2, waveletLevels-levelDiff);
 
     (*sTransform) = (*sTransform)*scaleT;
-    (*HRoffset) = scaleT*(*HRoffset);
+    (*HRoffset) = (*scaleDiff)*(*HRoffset);
 }
 
 /*Mat<float> scaleTransform(Mat<float> transform, int *scaleDiff){
@@ -331,12 +331,12 @@ void resampleImage(my_image_comp *in, my_image_comp *out, Mat<float> transform, 
     for(int r = 0; r < out->height; r++){
         for(int c = 0; c < out->stride; c++){
             Mat<float> output(2, 1);
-            output(0, 0) = r;
-            output(1, 0) = c;
+            output(1, 0) = r;
+            output(0, 0) = c;
             Mat<float> input = transform*output+offset;
 
-            float inR = input(0, 0);
-            float inC = input(1, 0);
+            float inR = input(1, 0);
+            float inC = input(0, 0);
 
             if(inC > -2 && inC < out->width+1 && inR > -2 && inR < out->height+1){
                 int r0 = (int)inR;

@@ -7,6 +7,7 @@
 /*****************************************************************************/
 
 #include <string.h>
+#include <math.h>
 #include "io_bmp.h"
 #include "image_comps.h"
 #include "combine.h"
@@ -19,20 +20,22 @@ void printUsage(char* fileName);
 
 int main(int argc, char *argv[]){
 
-    if((argc == 8 && strcmp(argv[1], "-ci") == 0) || (argc == 9 && strcmp(argv[1], "-cw")==0)){
+    if((argc == 9 && strcmp(argv[1], "-ci") == 0) || (argc == 9 && strcmp(argv[1], "-cw")==0)){
         
         int err_code=0;
         try {
-            if(argc == 8){
+            if(strcmp(argv[1], "-ci") == 0){
                 int waveletType;
                 int combineType;
                 int waveletLevels;
+                float lamda;
 
                 sscanf(argv[5], "%d", &waveletType);
                 sscanf(argv[6], "%d", &combineType);
                 sscanf(argv[7], "%d", &waveletLevels);
+                sscanf(argv[8], "%f", &lamda);
 
-                if((err_code = combineImages(argv[2], argv[3], argv[4], waveletType, combineType, waveletLevels))){
+                if((err_code = combineImages(argv[2], argv[3], argv[4], waveletType, combineType, waveletLevels, lamda))){
                     throw err_code;
                 }
             } else {

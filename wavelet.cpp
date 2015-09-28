@@ -344,7 +344,11 @@ void synthesis(my_image_comp *in, my_image_comp *out, int spacing, float* LPfilt
         for(int c = -HP_HL*spacing; c < in->stride + HP_HL*spacing; c+=2*spacing){
             for(int n = -LP_HL; n <= LP_HL; n++){
                 if(c+spacing*n >= 0 && c+spacing*n < out->width){
-                    tempPicBuf[r*out->width+c+spacing*n] += LPfilter[n] * in->buf[r*in->stride+c];
+                    if(in->buf[r*in->stride+c] == INVALID || tempPicBuf[r*out->width+c+spacing*n] == INVALID){
+                        tempPicBuf[r*out->width+c+spacing*n] = INVALID;
+                    } else {
+                        tempPicBuf[r*out->width+c+spacing*n] += LPfilter[n] * in->buf[r*in->stride+c];
+                    }
                 }
             }
         }
@@ -355,7 +359,11 @@ void synthesis(my_image_comp *in, my_image_comp *out, int spacing, float* LPfilt
         for(int c = -HP_HL*spacing+spacing; c < in->stride + HP_HL*spacing; c+=2*spacing){
             for(int n = -HP_HL; n <= HP_HL; n++){
                 if(c+spacing*n >= 0 && c+spacing*n < out->width){
-                    tempPicBuf[r*out->width+c+spacing*n] += HPfilter[n] * in->buf[r*in->stride+c];
+                    if(in->buf[r*in->stride+c] == INVALID || tempPicBuf[r*out->width+c+spacing*n] == INVALID){
+                        tempPicBuf[r*out->width+c+spacing*n] = INVALID;
+                    } else {
+                        tempPicBuf[r*out->width+c+spacing*n] += HPfilter[n] * in->buf[r*in->stride+c];
+                    }
                 }
             }
         }
@@ -366,7 +374,11 @@ void synthesis(my_image_comp *in, my_image_comp *out, int spacing, float* LPfilt
         for(int c = 0; c < out->width; c+=spacing){
             for(int n = -LP_HL; n <= LP_HL; n++){
                 if(r+spacing*n >= 0 && r+spacing*n < out->height){
-                    out->buf[(r+spacing*n)*out->stride+c] += LPfilter[n] * tempPicBuf[r*out->width+c];
+                    if(tempPicBuf[r*out->width+c] == INVALID || out->buf[(r+spacing*n)*out->stride+c] == INVALID){
+                        out->buf[(r+spacing*n)*out->stride+c] = INVALID;
+                    } else {
+                        out->buf[(r+spacing*n)*out->stride+c] += LPfilter[n] * tempPicBuf[r*out->width+c];
+                    }
                 }
             }
         }
@@ -377,7 +389,11 @@ void synthesis(my_image_comp *in, my_image_comp *out, int spacing, float* LPfilt
         for(int c = 0; c < out->width; c+=spacing){
             for(int n = -HP_HL; n <= HP_HL; n++){
                 if(r+spacing*n >= 0 && r+spacing*n < out->height){
-                    out->buf[(r+spacing*n)*out->stride+c] += HPfilter[n] * tempPicBuf[r*out->width+c];
+                    if(tempPicBuf[r*out->width+c] == INVALID || out->buf[(r+spacing*n)*out->stride+c] == INVALID){
+                        out->buf[(r+spacing*n)*out->stride+c] = INVALID;
+                    } else {
+                        out->buf[(r+spacing*n)*out->stride+c] += HPfilter[n] * tempPicBuf[r*out->width+c];
+                    }
                 }
             }
         }

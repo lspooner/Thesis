@@ -12,7 +12,7 @@
 #define MAX_VALUE_BLEND_LR 3
 #define BLEND_ALL 4
 
-int combineImages(char* LRinputFile, char* HRinputFile, char* outputFile, int waveletType, int combineType, int waveletLevels);
+int combineImages(char* LRinputFile, char* HRinputFile, char* outputFile, int waveletType, int combineType, int waveletLevels, float lamda);
 int combineWavelets(char* LRinputFile, char* HRinputFile, char* outputFile, int LRspacing, int method, int Roffset, int Coffset);
 
 #endif //COMBINE_IMAGES_H
