@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <assert.h>
+#include <float.h>
 #include "image_comps.h"
 #include "io_bmp.h"
 #include "wavelet.h"
@@ -14,7 +15,8 @@
 
 struct boundaryPoint
 {
-    Mat<int> point;
+    //Mat<int> prevPoint;
+    int prevPoint;
     float cost;
 };
 
@@ -30,10 +32,10 @@ void getDiscontinuities(my_image_comp *image, Mat<int> offset, int height, int w
 void makeBoundaryDifferenceImage(my_image_comp *inLR_wavelet, my_image_comp *inHR_wavelet, my_image_comp *boundaryImage, Mat<int> offset, int waveletLevels, int commonWaveletLevels);
 float getPixelCost(my_image_comp *boundaryImage, Mat<int> pixel, bool horizontal);
 float findBoundary(my_image_comp *boundaryImage, int** leftBoundary, int** rightBoundary, int** topBoundary, int** bottomBoundary);
-int* findLeftBoundary(my_image_comp *boundaryImage, int boundaryWidth, float* minCost);
-int* findRightBoundary(my_image_comp *boundaryImage, int boundaryWidth, float* minCost);
-int* findTopBoundary(my_image_comp *boundaryImage, int boundaryWidth, float* minCost);
-int* findBottomBoundary(my_image_comp *boundaryImage, int boundaryWidth, float* minCost);
+int* findLeftBoundary(my_image_comp *boundaryImage, int boundaryWidth, float* pathCost);
+int* findRightBoundary(my_image_comp *boundaryImage, int boundaryWidth, float* pathCost);
+int* findTopBoundary(my_image_comp *boundaryImage, int boundaryWidth, float* pathCost);
+int* findBottomBoundary(my_image_comp *boundaryImage, int boundaryWidth, float* pathCost);
 
 int* leftBoundary;
 int* rightBoundary;
@@ -189,9 +191,9 @@ int combineImages(char* LRinputFile, char* HRinputFile, char* outputFile, int wa
         assert(outputBMP((char*)"images/boundaryImage.bmp", boundaryImage, 1) == 0);
         float discontinuities = findBoundary(boundaryImage, &leftBoundary, &rightBoundary, &topBoundary, &bottomBoundary);
 
-        /*printf("\nTop Boundary:\n");
+        /*printf("\nLeft Boundary:\n");
         for(int i = 0; i < boundaryImage->height; i++){
-            printf("%d\n", topBoundary[i]);
+            printf("%d\n", leftBoundary[i]);
         }
         printf("\n");*/
 
@@ -566,6 +568,14 @@ float getPixelCost(my_image_comp *boundaryImage, Mat<int> pixel, int boundaryWid
     return (1-lamda)*boundaryImage->buf[pixel(1)*boundaryImage->stride+pixel(0)] + lamda*boundaryDistance;
 }
 
+int* makeArray(int value, int length){
+    int* array = new int[length];
+    for(int i = 0; i < length; i++){
+        array[i] = value;
+    }
+    return array;
+}
+
 float findBoundary(my_image_comp *boundaryImage, int** leftBoundary, int** rightBoundary, int** topBoundary, int** bottomBoundary){
     int boundaryWidth = 500;
     float cost;
@@ -579,10 +589,358 @@ float findBoundary(my_image_comp *boundaryImage, int** leftBoundary, int** right
     (*bottomBoundary) = findBottomBoundary(boundaryImage, boundaryWidth, &cost);
     totalCost += cost;
 
+    //(*rightBoundary) = makeArray(boundaryImage->width-1, boundaryImage->height);
+    //(*topBoundary) = makeArray(0, boundaryImage->width);
+    //(*bottomBoundary) = makeArray(boundaryImage->height-1, boundaryImage->width);
+
     return totalCost;
 }
 
-int* findLeftBoundary(my_image_comp *boundaryImage, int boundaryWidth, float* minCost){
+int* findLeftBoundary(my_image_comp *boundaryImage, int boundaryWidth, float* pathCost){
+    //make array to keep track of where the invalid pixels start for each row
+    int *invalidOffset = new int[boundaryImage->height];
+    for(int r = 0; r < boundaryImage->height; r++){
+        int c = 0;
+        while(c < boundaryImage->width && boundaryImage->buf[r*boundaryImage->stride+c] == INVALID){
+            c++;
+        }
+        invalidOffset[r] = c;
+    }
+
+    //calculate the cost to get to each point within the boundary
+    boundaryPoint **boundaryCost = new boundaryPoint*[boundaryImage->height];
+    for(int i = 0; i < boundaryImage->height; i++){
+        boundaryCost[i] = new boundaryPoint[boundaryWidth];
+    }
+
+    for(int r = 0; r < boundaryImage->height; r++){
+        for(int c = 0; c < boundaryWidth; c++){
+            Mat<int> pixel(2,1);
+            pixel(0) = c + invalidOffset[r];
+            pixel(1) = r;
+            boundaryCost[r][c].cost = getPixelCost(boundaryImage, pixel, boundaryWidth, true);
+            if(r > 0){
+                //find the minimum previous cost and add it to the current cost
+                float prevCost[3];
+                int i = 0;
+                for(int k = c-1; k <= c+1; k++){
+                    if(k >= 0 && k < boundaryWidth){
+                        prevCost[i] = boundaryCost[r-1][k].cost;
+                    } else {
+                        prevCost[i] = FLT_MAX;
+                    }
+                    i++;
+                }
+
+                float minCost = prevCost[0];
+                int minIndex = 0;
+                for(int i = 1; i < 3; i++){
+                    if(prevCost[i] < minCost){
+                        minCost = prevCost[i];
+                        minIndex = i;
+                    }
+                }
+                boundaryCost[r][c].prevPoint = c + minIndex - 1;
+                if(minCost == FLT_MAX){
+                    boundaryCost[r][c].cost = FLT_MAX;
+                } else {
+                    boundaryCost[r][c].cost += minCost;
+                }
+            }
+        }
+    }
+
+    //find end of min cost path
+    float minCost = boundaryCost[boundaryImage->height-1][0].cost;
+    int minIndex = 0;
+    for(int i = 1; i < boundaryWidth; i++){
+        if(boundaryCost[boundaryImage->height-1][i].cost < minCost){
+            minCost = boundaryCost[boundaryImage->height-1][i].cost;
+            minIndex = i;
+        }
+    }
+
+    *pathCost = minCost;
+
+    //retrace path
+    int* leftBoundary = new int[boundaryImage->height];
+    leftBoundary[boundaryImage->height-1] = minIndex;
+    for(int i = boundaryImage->height-2; i >= 0; i--){
+        leftBoundary[i] = boundaryCost[i+1][leftBoundary[i+1]].prevPoint;
+    }
+
+    for(int i = 0; i < boundaryImage->height; i++){
+        leftBoundary[i] += invalidOffset[i];
+    }
+
+    delete[] invalidOffset;
+    for(int i = 0; i < boundaryImage->height; i++){
+        delete[] boundaryCost[i];
+    }
+    delete[] boundaryCost;
+
+    return leftBoundary;
+}
+
+int* findRightBoundary(my_image_comp *boundaryImage, int boundaryWidth, float* pathCost){
+    //make array to keep track of where the invalid pixels start for each row
+    int *invalidOffset = new int[boundaryImage->height];
+    for(int r = 0; r < boundaryImage->height; r++){
+        int c = boundaryImage->width-1;
+        while(c >= 0 && boundaryImage->buf[r*boundaryImage->stride+c] == INVALID){
+            c--;
+        }
+        invalidOffset[r] = c;
+    }
+
+    //calculate the cost to get to each point within the boundary
+    boundaryPoint **boundaryCost = new boundaryPoint*[boundaryImage->height];
+    for(int i = 0; i < boundaryImage->height; i++){
+        boundaryCost[i] = new boundaryPoint[boundaryWidth];
+    }
+
+    for(int r = 0; r < boundaryImage->height; r++){
+        for(int c = 0; c < boundaryWidth; c++){
+            Mat<int> pixel(2,1);
+            pixel(0) = c + invalidOffset[r] - boundaryWidth;
+            pixel(1) = r;
+            boundaryCost[r][c].cost = getPixelCost(boundaryImage, pixel, boundaryWidth, true);
+            if(r > 0){
+                //find the minimum previous cost and add it to the current cost
+                float prevCost[3];
+                int i = 0;
+                for(int k = c-1; k <= c+1; k++){
+                    if(k >= 0 && k < boundaryWidth){
+                        prevCost[i] = boundaryCost[r-1][k].cost;
+                    } else {
+                        prevCost[i] = FLT_MAX;
+                    }
+                    i++;
+                }
+
+                float minCost = prevCost[0];
+                int minIndex = 0;
+                for(int i = 1; i < 3; i++){
+                    if(prevCost[i] < minCost){
+                        minCost = prevCost[i];
+                        minIndex = i;
+                    }
+                }
+                boundaryCost[r][c].prevPoint = c + minIndex - 1;
+                if(minCost == FLT_MAX){
+                    boundaryCost[r][c].cost = FLT_MAX;
+                } else {
+                    boundaryCost[r][c].cost += minCost;
+                }
+            }
+        }
+    }
+
+    //find end of min cost path
+    float minCost = boundaryCost[boundaryImage->height-1][0].cost;
+    int minIndex = 0;
+    for(int i = 1; i < boundaryWidth; i++){
+        if(boundaryCost[boundaryImage->height-1][i].cost < minCost){
+            minCost = boundaryCost[boundaryImage->height-1][i].cost;
+            minIndex = i;
+        }
+    }
+
+    *pathCost = minCost;
+
+    //retrace path
+    int* rightBoundary = new int[boundaryImage->height];
+    rightBoundary[boundaryImage->height-1] = minIndex;
+    for(int i = boundaryImage->height-2; i >= 0; i--){
+        rightBoundary[i] = boundaryCost[i+1][rightBoundary[i+1]].prevPoint;
+    }
+
+    for(int i = 0; i < boundaryImage->height; i++){
+        rightBoundary[i] += (invalidOffset[i] - boundaryWidth);
+    }
+
+    delete[] invalidOffset;
+    for(int i = 0; i < boundaryImage->height; i++){
+        delete[] boundaryCost[i];
+    }
+    delete[] boundaryCost;
+
+    return rightBoundary;
+}
+
+int* findTopBoundary(my_image_comp *boundaryImage, int boundaryWidth, float* pathCost){
+    //make array to keep track of where the invalid pixels start for each row
+    int *invalidOffset = new int[boundaryImage->width];
+    for(int c = 0; c < boundaryImage->width; c++){
+        int r = 0;
+        while(r < boundaryImage->height && boundaryImage->buf[r*boundaryImage->stride+c] == INVALID){
+            r++;
+        }
+        invalidOffset[c] = r;
+    }
+
+    //calculate the cost to get to each point within the boundary
+    boundaryPoint **boundaryCost = new boundaryPoint*[boundaryImage->width];
+    for(int i = 0; i < boundaryImage->width; i++){
+        boundaryCost[i] = new boundaryPoint[boundaryWidth];
+    }
+
+    for(int c = 0; c < boundaryImage->width; c++){
+        for(int r = 0; r < boundaryWidth; r++){
+            Mat<int> pixel(2,1);
+            pixel(0) = c;
+            pixel(1) = r + invalidOffset[c];
+            boundaryCost[c][r].cost = getPixelCost(boundaryImage, pixel, boundaryWidth, true);
+            if(c > 0){
+                //find the minimum previous cost and add it to the current cost
+                float prevCost[3];
+                int i = 0;
+                for(int k = r-1; k <= r+1; k++){
+                    if(k >= 0 && k < boundaryWidth){
+                        prevCost[i] = boundaryCost[c-1][k].cost;
+                    } else {
+                        prevCost[i] = FLT_MAX;
+                    }
+                    i++;
+                }
+
+                float minCost = prevCost[0];
+                int minIndex = 0;
+                for(int i = 1; i < 3; i++){
+                    if(prevCost[i] < minCost){
+                        minCost = prevCost[i];
+                        minIndex = i;
+                    }
+                }
+                boundaryCost[c][r].prevPoint = r + minIndex - 1;
+                if(minCost == FLT_MAX){
+                    boundaryCost[c][r].cost = FLT_MAX;
+                } else {
+                    boundaryCost[c][r].cost += minCost;
+                }
+            }
+        }
+    }
+
+    //find end of min cost path
+    float minCost = boundaryCost[boundaryImage->width-1][0].cost;
+    int minIndex = 0;
+    for(int i = 1; i < boundaryWidth; i++){
+        if(boundaryCost[boundaryImage->width-1][i].cost < minCost){
+            minCost = boundaryCost[boundaryImage->width-1][i].cost;
+            minIndex = i;
+        }
+    }
+
+    *pathCost = minCost;
+
+    //retrace path
+    int* topBoundary = new int[boundaryImage->width];
+    topBoundary[boundaryImage->width-1] = minIndex;
+    for(int i = boundaryImage->width-2; i >= 0; i--){
+        topBoundary[i] = boundaryCost[i+1][topBoundary[i+1]].prevPoint;
+    }
+
+    for(int i = 0; i < boundaryImage->width; i++){
+        topBoundary[i] += invalidOffset[i];
+    }
+
+    delete[] invalidOffset;
+    for(int i = 0; i < boundaryImage->width; i++){
+        delete[] boundaryCost[i];
+    }
+    delete[] boundaryCost;
+
+    return topBoundary;
+}
+
+int* findBottomBoundary(my_image_comp *boundaryImage, int boundaryWidth, float* pathCost){
+    //make array to keep track of where the invalid pixels start for each row
+    int *invalidOffset = new int[boundaryImage->width];
+    for(int c = 0; c < boundaryImage->width; c++){
+        int r = boundaryImage->height-1;
+        while(r >= 0 && boundaryImage->buf[r*boundaryImage->stride+c] == INVALID){
+            r--;
+        }
+        invalidOffset[c] = r;
+    }
+
+    //calculate the cost to get to each point within the boundary
+    boundaryPoint **boundaryCost = new boundaryPoint*[boundaryImage->width];
+    for(int i = 0; i < boundaryImage->width; i++){
+        boundaryCost[i] = new boundaryPoint[boundaryWidth];
+    }
+
+    for(int c = 0; c < boundaryImage->width; c++){
+        for(int r = 0; r < boundaryWidth; r++){
+            Mat<int> pixel(2,1);
+            pixel(0) = c;
+            pixel(1) = r + invalidOffset[c] - boundaryWidth;
+            boundaryCost[c][r].cost = getPixelCost(boundaryImage, pixel, boundaryWidth, true);
+            if(c > 0){
+                //find the minimum previous cost and add it to the current cost
+                float prevCost[3];
+                int i = 0;
+                for(int k = r-1; k <= r+1; k++){
+                    if(k >= 0 && k < boundaryWidth){
+                        prevCost[i] = boundaryCost[c-1][k].cost;
+                    } else {
+                        prevCost[i] = FLT_MAX;
+                    }
+                    i++;
+                }
+
+                float minCost = prevCost[0];
+                int minIndex = 0;
+                for(int i = 1; i < 3; i++){
+                    if(prevCost[i] < minCost){
+                        minCost = prevCost[i];
+                        minIndex = i;
+                    }
+                }
+                boundaryCost[c][r].prevPoint = r + minIndex - 1;
+                if(minCost == FLT_MAX){
+                    boundaryCost[c][r].cost = FLT_MAX;
+                } else {
+                    boundaryCost[c][r].cost += minCost;
+                }
+            }
+        }
+    }
+
+    //find end of min cost path
+    float minCost = boundaryCost[boundaryImage->width-1][0].cost;
+    int minIndex = 0;
+    for(int i = 1; i < boundaryWidth; i++){
+        if(boundaryCost[boundaryImage->width-1][i].cost < minCost){
+            minCost = boundaryCost[boundaryImage->width-1][i].cost;
+            minIndex = i;
+        }
+    }
+
+    *pathCost = minCost;
+
+    //retrace path
+    int* topBoundary = new int[boundaryImage->width];
+    topBoundary[boundaryImage->width-1] = minIndex;
+    for(int i = boundaryImage->width-2; i >= 0; i--){
+        topBoundary[i] = boundaryCost[i+1][topBoundary[i+1]].prevPoint;
+    }
+
+    for(int i = 0; i < boundaryImage->width; i++){
+        topBoundary[i] += (invalidOffset[i] - boundaryWidth);
+    }
+
+    delete[] invalidOffset;
+    for(int i = 0; i < boundaryImage->width; i++){
+        delete[] boundaryCost[i];
+    }
+    delete[] boundaryCost;
+
+    return topBoundary;
+}
+
+/*int* findLeftBoundary(my_image_comp *boundaryImage, int boundaryWidth, float* minCost){
 
     //starting with just left hand side for now
     //initialise starting array
@@ -855,4 +1213,4 @@ int* findBottomBoundary(my_image_comp *boundaryImage, int boundaryWidth, float* 
     delete[] paths;
 
     return bottomBoundary;
-}
+}*/
