@@ -20,16 +20,16 @@ struct boundaryPoint
     float cost;
 };
 
-void combineWavelets(my_image_comp *inLR, my_image_comp *inHR, my_image_comp *out, int LRspacing, int method, Mat<int>offset);
-void maxValueCombination(my_image_comp *inLR, my_image_comp *inHR, my_image_comp *out, int LRspacing, Mat<int>offset);
-void maxValueCombinationRetainLR(my_image_comp *inLR, my_image_comp *inHR, my_image_comp *out, int LRspacing, Mat<int>offset);
-void maxValueCombinationAverageLR(my_image_comp *inLR, my_image_comp *inHR, my_image_comp *out, int LRspacing, Mat<int>offset);
-void maxValueCombinationBlendLR(my_image_comp *inLR, my_image_comp *inHR, my_image_comp *out, int LRspacing, Mat<int>offset);
-void allBlendCombination(my_image_comp *inLR, my_image_comp *inHR, my_image_comp *out, int LRspacing, Mat<int>offset);
+void combineWavelets(my_image_comp *inLR, my_image_comp *inHR, my_image_comp *out, int scaleDiff, int LRspacing, int method, Mat<int>offset);
+void maxValueCombination(my_image_comp *inLR, my_image_comp *inHR, my_image_comp *out, int scaleDiff, int LRspacing, Mat<int>offset);
+void maxValueCombinationRetainLR(my_image_comp *inLR, my_image_comp *inHR, my_image_comp *out, int scaleDiff, int LRspacing, Mat<int>offset);
+void maxValueCombinationAverageLR(my_image_comp *inLR, my_image_comp *inHR, my_image_comp *out, int scaleDiff, int LRspacing, Mat<int>offset);
+void maxValueCombinationBlendLR(my_image_comp *inLR, my_image_comp *inHR, my_image_comp *out, int scaleDiff, int LRspacing, Mat<int>offset);
+void allBlendCombination(my_image_comp *inLR, my_image_comp *inHR, my_image_comp *out, int scaleDiff, int LRspacing, Mat<int>offset);
 void getLuminance(my_image_comp *in, my_image_comp *out);
 void getHRinfo(my_image_comp *image, Mat<int> offset, int scaleDiff, int height, int width, float* HRinfo);
 void getDiscontinuities(my_image_comp *image, Mat<int> offset, int height, int width, float* discontinuities);
-void makeBoundaryDifferenceImage(my_image_comp *inLR_wavelet, my_image_comp *inHR_wavelet, my_image_comp *boundaryImage, Mat<int> offset, int waveletLevels, int commonWaveletLevels);
+void makeBoundaryDifferenceImage(my_image_comp *inLR_wavelet, my_image_comp *inHR_wavelet, my_image_comp *boundaryImage, Mat<int> offset, int waveletLevels, int commonWaveletLevels, int combineType);
 float getPixelCost(my_image_comp *boundaryImage, Mat<int> pixel, bool horizontal);
 float findBoundary(my_image_comp *boundaryImage, int** leftBoundary, int** rightBoundary, int** topBoundary, int** bottomBoundary);
 int* findLeftBoundary(my_image_comp *boundaryImage, int boundaryWidth, float* pathCost);
@@ -140,69 +140,84 @@ int combineImages(char* LRinputFile, char* HRinputFile, char* outputFile, int wa
     my_image_comp *output_comps = new my_image_comp[num_comps];
 
     float totalHRinfo = 0.0;
-    float totalDiscontinuities = 0.0;
+    //float totalDiscontinuities = 0.0;
 
-    for(int n = 0; n < num_comps; n++){
+    
         //printf("n = %d, about to transform HR\n", n);
-        my_image_comp *inHR_transformed = new my_image_comp;
-        inHR_transformed->init(HRheight, HRwidth, HL_A53_LP*pow(2, waveletLevels)+HL_A53_HP);
+    my_image_comp *inHR_transformed = new my_image_comp[num_comps];
+    for(int n = 0; n < num_comps; n++){
+        inHR_transformed[n].init(HRheight, HRwidth, HL_A53_LP*pow(2, waveletLevels)+HL_A53_HP);
         input_comps_HR[n].perform_boundary_extension_symmetric();
-        resampleImage(input_comps_HR+n, inHR_transformed, transform, offset_resample);
-        delete[] input_comps_HR[n].handle;
+        resampleImage(input_comps_HR+n, inHR_transformed+n, transform, offset_resample);
+    }
+    delete[] input_comps_HR;
 
         //assert(outputBMP((char*)"images/inHR_transformed.bmp", inHR_transformed, 1) == 0);
 
         //printf("n = %d, about to analyse HR\n", n);
-        my_image_comp *inHR_wavelet = new my_image_comp;
-        inHR_wavelet->init(HRheight, HRwidth, 0);
+    my_image_comp *inHR_wavelet = new my_image_comp[num_comps];
+    for(int n = 0; n < num_comps; n++){
+        inHR_wavelet[n].init(HRheight, HRwidth, 0);
         if(waveletType == WAVELET_53){
-            analysis_5_3(inHR_transformed, inHR_wavelet, waveletLevels);
+            analysis_5_3(inHR_transformed+n, inHR_wavelet+n, waveletLevels);
         } else {
-            analysis_9_7(inHR_transformed, inHR_wavelet, waveletLevels);
+            analysis_9_7(inHR_transformed+n, inHR_wavelet+n, waveletLevels);
         }
-        delete inHR_transformed;
+    }
+    delete[] inHR_transformed;
 
         //assert(outputBMP((char*)"images/inHR_wavelet.bmp", inHR_wavelet, 1) == 0);
 
         //printf("n = %d, about to analyse LR\n", n);
-        my_image_comp *inLR_wavelet_small = new my_image_comp;
-        inLR_wavelet_small->init(LRheight, LRwidth, 0);
+    my_image_comp *inLR_wavelet_small = new my_image_comp[num_comps];
+    for(int n = 0; n < num_comps; n++){
+        inLR_wavelet_small[n].init(LRheight, LRwidth, 0);
         if(waveletType == WAVELET_53){
-            analysis_5_3(input_comps_LR+n, inLR_wavelet_small, waveletLevels-levelDiff);
+            analysis_5_3(input_comps_LR+n, inLR_wavelet_small+n, waveletLevels-levelDiff);
         } else {
-            analysis_9_7(input_comps_LR+n, inLR_wavelet_small, waveletLevels-levelDiff);
+            analysis_9_7(input_comps_LR+n, inLR_wavelet_small+n, waveletLevels-levelDiff);
         }
-        delete[] input_comps_LR[n].handle;
+    }
+    delete[] input_comps_LR;
         //assert(outputBMP((char*)"images/inLR_wavelet_small.bmp", inLR_wavelet_small, 1) == 0);
 
         //printf("n = %d, about to increase LR\n", n);
-        my_image_comp *inLR_wavelet = new my_image_comp;
-        inLR_wavelet->init(Outheight, Outwidth, 0);
-        increaseWaveletLevel(inLR_wavelet_small, inLR_wavelet, scaleDiff);
-        delete inLR_wavelet_small;
+        //my_image_comp *inLR_wavelet = new my_image_comp;
+        //inLR_wavelet->init(Outheight, Outwidth, 0);
+        //increaseWaveletLevel(inLR_wavelet_small, inLR_wavelet, scaleDiff);
+        //delete inLR_wavelet_small;
 
         //assert(outputBMP((char*)"images/inLR_wavelet.bmp", inLR_wavelet, 1) == 0);
 
         //find boundary
-        lamda = lamdaIn;
-        my_image_comp *boundaryImage = new my_image_comp;
-        boundaryImage->init(HRheight, HRwidth, 0);
-        makeBoundaryDifferenceImage(inLR_wavelet, inHR_wavelet, boundaryImage, offset, waveletLevels, waveletLevels-levelDiff);
-        assert(outputBMP((char*)"images/boundaryImage.bmp", boundaryImage, 1) == 0);
-        float discontinuities = findBoundary(boundaryImage, &leftBoundary, &rightBoundary, &topBoundary, &bottomBoundary);
+    lamda = lamdaIn;
+    my_image_comp *boundaryImage_multi = new my_image_comp[num_comps];
+    for(int n = 0; n < num_comps; n++){
+        boundaryImage_multi[n].init(HRheight, HRwidth, 0);
+        makeBoundaryDifferenceImage(inLR_wavelet_small+n, inHR_wavelet+n, boundaryImage_multi+n, offset, waveletLevels, waveletLevels-levelDiff, combineType);
+    }
+    my_image_comp *boundaryImage = new my_image_comp;
+    boundaryImage->init(HRheight, HRwidth, 0);
+    getLuminance(boundaryImage_multi, boundaryImage);
+    assert(outputBMP((char*)"images/boundaryImage.bmp", boundaryImage, 1) == 0);
+    float discontinuities = findBoundary(boundaryImage, &leftBoundary, &rightBoundary, &topBoundary, &bottomBoundary);
+    delete[] boundaryImage_multi;
 
-        /*printf("\nLeft Boundary:\n");
-        for(int i = 0; i < boundaryImage->height; i++){
-            printf("%d\n", leftBoundary[i]);
-        }
-        printf("\n");*/
+    printf("\nRight Boundary:\n");
+    for(int i = 0; i < boundaryImage->height; i++){
+        printf("%d => %d\n", i, rightBoundary[i]);
+    }
+    printf("\n");
+    delete boundaryImage;
 
         //printf("n = %d, about to combine wavelets\n", n);
+    for(int n = 0; n < num_comps; n++){
         my_image_comp *out_wavelet = new my_image_comp;
         out_wavelet->init(Outheight, Outwidth, HL_S97_HP*pow(2, waveletLevels)+HL_S97_LP);
-        combineWavelets(inLR_wavelet, inHR_wavelet, out_wavelet, scaleDiff, combineType, offset*scaleDiff);
-        delete inLR_wavelet;
-        delete inHR_wavelet;
+        combineWavelets(inLR_wavelet_small+n, inHR_wavelet+n, out_wavelet, scaleDiff, (int)pow(2, waveletLevels), combineType, offset*scaleDiff);
+        //delete inLR_wavelet;
+        delete[] inLR_wavelet_small[n].handle;
+        delete[] inHR_wavelet[n].handle;
 
         //assert(outputBMP((char*)"images/out_wavelet.bmp", out_wavelet, 1) == 0);
 
@@ -222,10 +237,10 @@ int combineImages(char* LRinputFile, char* HRinputFile, char* outputFile, int wa
         //getDiscontinuities(output_comps+n, offset*scaleDiff, HRheight, HRwidth, &discontinuities);
 
         totalHRinfo += HRinfo;
-        totalDiscontinuities += discontinuities;
+        //printf("%d,%d,%f, %f,%f\n", combineType, waveletLevels, lamda, totalHRinfo, totalDiscontinuities);
     }
 
-    printf("%d,%d,%f, %f,%f\n", combineType, waveletLevels, lamda, totalHRinfo, totalDiscontinuities);
+    printf("%d,%d,%f,%f,%f\n", combineType, waveletLevels, lamda, totalHRinfo, discontinuities);
 
     // Write the image back out again
     if((err_code = outputBMP(outputFile, output_comps, num_comps)) != 0){
@@ -264,7 +279,7 @@ int combineWavelets(char* LRinputFile, char* HRinputFile, char* outputFile, int 
     offset(1) = Roffset;
 
     for (int n=0; n < num_comps; n++){
-        combineWavelets(inLR+n, inHR+n, output_comps+n, LRspacing, method, offset);
+        combineWavelets(inLR+n, inHR+n, output_comps+n, LRspacing, LRspacing, method, offset);
     }
 
     // Write the image back out again
@@ -277,23 +292,23 @@ int combineWavelets(char* LRinputFile, char* HRinputFile, char* outputFile, int 
     return 0;
 }
 
-void combineWavelets(my_image_comp *inLR, my_image_comp *inHR, my_image_comp *out, int LRspacing, int method, Mat<int>offset){
+void combineWavelets(my_image_comp *inLR, my_image_comp *inHR, my_image_comp *out, int scaleDiff, int LRspacing, int method, Mat<int>offset){
     //TODO: fix this: note: currently assumes HR image is completely enclosed in LR images
 
     if(method == MAX_VALUE){
-        maxValueCombination(inLR, inHR, out, LRspacing, offset);
+        maxValueCombination(inLR, inHR, out, scaleDiff, LRspacing, offset);
     } else if(method == MAX_VALUE_RETAIN_LR){
-        maxValueCombinationRetainLR(inLR, inHR, out, LRspacing, offset);
+        maxValueCombinationRetainLR(inLR, inHR, out, scaleDiff, LRspacing, offset);
     } else if(method == MAX_VALUE_AVERAGE_LR){
-        maxValueCombinationAverageLR(inLR, inHR, out, LRspacing, offset);
+        maxValueCombinationAverageLR(inLR, inHR, out, scaleDiff, LRspacing, offset);
     } else if(method == MAX_VALUE_BLEND_LR){
-        maxValueCombinationBlendLR(inLR, inHR, out, LRspacing, offset);
+        maxValueCombinationBlendLR(inLR, inHR, out, scaleDiff, LRspacing, offset);
     } else if(method == BLEND_ALL){
-        allBlendCombination(inLR, inHR, out, LRspacing, offset);
+        allBlendCombination(inLR, inHR, out, scaleDiff, LRspacing, offset);
     }
 }
 
-void maxValueCombination(my_image_comp *inLR, my_image_comp *inHR, my_image_comp *out, int LRspacing, Mat<int>offset){
+void maxValueCombination(my_image_comp *inLR, my_image_comp *inHR, my_image_comp *out, int scaleDiff, int LRspacing, Mat<int>offset){
     Mat<int> offset_high(2,1);
     offset_high(1) = offset(1)+inHR->height;
     offset_high(0) = offset(0)+inHR->width;
@@ -303,8 +318,8 @@ void maxValueCombination(my_image_comp *inLR, my_image_comp *inHR, my_image_comp
     for(int r = 0; r < out->height; r++){
         for(int c = 0; c < out->width; c++){
             if(r < offset(1) || r >= offset_high(1) || c < offset(0) || c >= offset_high(0) ){
-                if(r%LRspacing == 0 && c%LRspacing == 0){
-                    out->buf[r*out->stride+c] = inLR->buf[r*inLR->stride+c];
+                if(r%scaleDiff == 0 && c%scaleDiff == 0){
+                    out->buf[r*out->stride+c] = inLR->buf[(r/scaleDiff)*inLR->stride+(c/scaleDiff)];
                 } else {
                     out->buf[r*out->stride+c] = 0;
                 }
@@ -313,20 +328,27 @@ void maxValueCombination(my_image_comp *inLR, my_image_comp *inHR, my_image_comp
                 int cHR = c-offset(0);
                 if(rHR >= topBoundary[cHR] && rHR <= bottomBoundary[cHR] && cHR >= leftBoundary[rHR] && cHR <= rightBoundary[rHR]){
                     //printf("r = %d, r-offset = %d, c = %d, c-offset = %d\n", r, r-offset(1), c, c-offset(0));
-                    float maxVal = max(abs(inLR->buf[r*inLR->stride+c]), abs(inHR->buf[rHR*inHR->stride+cHR]));
-                    if(maxVal != inLR->buf[r*inLR->stride+c] && maxVal != inHR->buf[rHR*inHR->stride+cHR]){
-                        maxVal *= -1;
+                    float maxVal = inHR->buf[rHR*inHR->stride+cHR];
+                    if(r%scaleDiff == 0 && c%scaleDiff == 0){
+                        maxVal = max(abs(inLR->buf[(r/scaleDiff)*inLR->stride+(c/scaleDiff)]), abs(inHR->buf[rHR*inHR->stride+cHR]));
+                        if(maxVal != inLR->buf[(r/scaleDiff)*inLR->stride+(c/scaleDiff)] && maxVal != inHR->buf[rHR*inHR->stride+cHR]){
+                            maxVal *= -1;
+                        }
                     }
                     out->buf[r*out->stride+c] = maxVal;
                 } else {
-                    out->buf[r*out->stride+c] = inLR->buf[r*inLR->stride+c];
+                    if(r%scaleDiff == 0 && c%scaleDiff == 0){
+                        out->buf[r*out->stride+c] = inLR->buf[(r/scaleDiff)*inLR->stride+(c/scaleDiff)];
+                    } else {
+                        out->buf[r*out->stride+c] = 0;
+                    }
                 }
             }
         }
     }
 }
 
-void maxValueCombinationRetainLR(my_image_comp *inLR, my_image_comp *inHR, my_image_comp *out, int LRspacing, Mat<int>offset){
+void maxValueCombinationRetainLR(my_image_comp *inLR, my_image_comp *inHR, my_image_comp *out, int scaleDiff, int LRspacing, Mat<int>offset){
     Mat<int> offset_high(2,1);
     offset_high(1) = offset(1)+inHR->height;
     offset_high(0) = offset(0)+inHR->width;
@@ -334,27 +356,35 @@ void maxValueCombinationRetainLR(my_image_comp *inLR, my_image_comp *inHR, my_im
     for(int r = 0; r < out->height; r++){
         for(int c = 0; c < out->width; c++){
             if(r < offset(1) || r >= offset_high(1) || c < offset(0) || c >= offset_high(0) ){
-                if(r%LRspacing == 0 && c%LRspacing == 0){
-                    out->buf[r*out->stride+c] = inLR->buf[r*inLR->stride+c];
+                if(r%scaleDiff == 0 && c%scaleDiff == 0){
+                    out->buf[r*out->stride+c] = inLR->buf[(r/scaleDiff)*inLR->stride+(c/scaleDiff)];
                 } else {
                     out->buf[r*out->stride+c] = 0;
                 }
             } else {
-                if(inHR->buf[(r-offset(1))*inHR->stride+(c-offset(0))] == INVALID || (r%LRspacing == 0 && c%LRspacing == 0)){
-                     out->buf[r*out->stride+c] = inLR->buf[r*inLR->stride+c];
-                } else {
-                    float maxVal = max(abs(inLR->buf[r*inLR->stride+c]), abs(inHR->buf[(r-offset(1))*inHR->stride+(c-offset(0))]));
-                    if(maxVal != inLR->buf[r*inLR->stride+c] && maxVal != inHR->buf[(r-offset(1))*inHR->stride+(c-offset(0))]){
-                        maxVal *= -1;
+                int rHR = r-offset(1);
+                int cHR = c-offset(0);
+                if(r%LRspacing == 0 && c%LRspacing == 0){
+                    out->buf[r*out->stride+c] = inLR->buf[(r/scaleDiff)*inLR->stride+(c/scaleDiff)];
+                } else if(rHR >= topBoundary[cHR] && rHR <= bottomBoundary[cHR] && cHR >= leftBoundary[rHR] && cHR <= rightBoundary[rHR]){
+                    //printf("r = %d, r-offset = %d, c = %d, c-offset = %d\n", r, r-offset(1), c, c-offset(0));
+                    float maxVal = inHR->buf[rHR*inHR->stride+cHR];
+                    if(r%scaleDiff == 0 && c%scaleDiff == 0){
+                        maxVal = max(abs(inLR->buf[(r/scaleDiff)*inLR->stride+(c/scaleDiff)]), abs(inHR->buf[rHR*inHR->stride+cHR]));
+                        if(maxVal != inLR->buf[(r/scaleDiff)*inLR->stride+(c/scaleDiff)] && maxVal != inHR->buf[rHR*inHR->stride+cHR]){
+                            maxVal *= -1;
+                        }
                     }
                     out->buf[r*out->stride+c] = maxVal;
+                } else {
+                    out->buf[r*out->stride+c] = 0;
                 }
             }
         }
     }
 }
 
-void maxValueCombinationBlendLR(my_image_comp *inLR, my_image_comp *inHR, my_image_comp *out, int LRspacing, Mat<int>offset){
+void maxValueCombinationBlendLR(my_image_comp *inLR, my_image_comp *inHR, my_image_comp *out, int scaleDiff, int LRspacing, Mat<int>offset){
     Mat<int> offset_high(2,1);
     offset_high(1) = offset(1)+inHR->height;
     offset_high(0) = offset(0)+inHR->width;
@@ -370,6 +400,27 @@ void maxValueCombinationBlendLR(my_image_comp *inLR, my_image_comp *inHR, my_ima
                     out->buf[r*out->stride+c] = 0;
                 }
             } else {
+                int rHR = r-offset(1);
+                int cHR = c-offset(0);
+                if(rHR >= topBoundary[cHR] && rHR <= bottomBoundary[cHR] && cHR >= leftBoundary[rHR] && cHR <= rightBoundary[rHR]){
+                    //printf("r = %d, r-offset = %d, c = %d, c-offset = %d\n", r, r-offset(1), c, c-offset(0));
+                    float maxVal = inHR->buf[rHR*inHR->stride+cHR];
+                    if(r%LRspacing == 0 && c%LRspacing == 0){
+                        maxVal = max(abs(inLR->buf[(r/LRspacing)*inLR->stride+(c/LRspacing)]), abs(inHR->buf[rHR*inHR->stride+cHR]));
+                        if(maxVal != inLR->buf[(r/LRspacing)*inLR->stride+(c/LRspacing)] && maxVal != inHR->buf[rHR*inHR->stride+cHR]){
+                            maxVal *= -1;
+                        }
+                    }
+                    out->buf[r*out->stride+c] = maxVal;
+                } else {
+                    if(r%LRspacing == 0 && c%LRspacing == 0){
+                        out->buf[r*out->stride+c] = inLR->buf[(r/LRspacing)*inLR->stride+(c/LRspacing)];
+                    } else {
+                        out->buf[r*out->stride+c] = 0;
+                    }
+                }
+
+                
                 if(inHR->buf[(r-offset(1))*inHR->stride+(c-offset(0))] == INVALID){
                     out->buf[r*out->stride+c] = inLR->buf[r*inLR->stride+c];
                 } else if(r%LRspacing == 0 && c%LRspacing == 0){
@@ -394,7 +445,7 @@ void maxValueCombinationBlendLR(my_image_comp *inLR, my_image_comp *inHR, my_ima
 }
 
 
-void maxValueCombinationAverageLR(my_image_comp *inLR, my_image_comp *inHR, my_image_comp *out, int LRspacing, Mat<int>offset){
+void maxValueCombinationAverageLR(my_image_comp *inLR, my_image_comp *inHR, my_image_comp *out, int scaleDiff, int LRspacing, Mat<int>offset){
     Mat<int> offset_high(2,1);
     offset_high(1) = offset(1)+inHR->height;
     offset_high(0) = offset(0)+inHR->width;
@@ -424,7 +475,7 @@ void maxValueCombinationAverageLR(my_image_comp *inLR, my_image_comp *inHR, my_i
     }
 }
 
-void allBlendCombination(my_image_comp *inLR, my_image_comp *inHR, my_image_comp *out, int LRspacing, Mat<int>offset){
+void allBlendCombination(my_image_comp *inLR, my_image_comp *inHR, my_image_comp *out, int scaleDiff, int LRspacing, Mat<int>offset){
     Mat<int> offset_high(2,1);
     offset_high(1) = offset(1)+inHR->height;
     offset_high(0) = offset(0)+inHR->width;
@@ -434,8 +485,8 @@ void allBlendCombination(my_image_comp *inLR, my_image_comp *inHR, my_image_comp
     for(int r = 0; r < out->height; r++){
         for(int c = 0; c < out->width; c++){
             if(r < offset(1) || r >= offset_high(1) || c < offset(0) || c >= offset_high(0) ){
-                if(r%LRspacing == 0 && c%LRspacing == 0){
-                    out->buf[r*out->stride+c] = inLR->buf[r*inLR->stride+c];
+                if(r%scaleDiff == 0 && c%scaleDiff == 0){
+                    out->buf[r*out->stride+c] = inLR->buf[(r/scaleDiff)*inLR->stride+(c/scaleDiff)];
                 } else {
                     out->buf[r*out->stride+c] = 0;
                 }
@@ -449,10 +500,16 @@ void allBlendCombination(my_image_comp *inLR, my_image_comp *inHR, my_image_comp
                         float scaleR = min(((float)(r-offset(1))/(float)LRspacing)/(float)blendBoundary, ((float)(offset_high(1)-r)/(float)LRspacing)/(float)blendBoundary);
                         float scaleC = min(((float)(c-offset(0))/(float)LRspacing)/(float)blendBoundary, ((float)(offset_high(0)-c)/(float)LRspacing)/(float)blendBoundary);
                         float scale = min(scaleR, scaleC);
-                        out->buf[r*out->stride+c] = (1-scale)*inLR->buf[r*inLR->stride+c] + scale*inHR->buf[(r-offset(1))*inHR->stride+(c-offset(0))];
+                        if(r%scaleDiff == 0 && c%scaleDiff == 0){
+                            out->buf[r*out->stride+c] = (1-scale)*inLR->buf[(r/scaleDiff)*inLR->stride+(c/scaleDiff)] + scale*inHR->buf[(r-offset(1))*inHR->stride+(c-offset(0))];
+                        } else {
+                            out->buf[r*out->stride+c] = scale*inHR->buf[(r-offset(1))*inHR->stride+(c-offset(0))];
+                        }
                     }
+                } else if(r%scaleDiff == 0 && c%scaleDiff == 0){
+                    out->buf[r*out->stride+c] = inLR->buf[(r/scaleDiff)*inLR->stride+(c/scaleDiff)];
                 } else {
-                    out->buf[r*out->stride+c] = inLR->buf[r*inLR->stride+c];
+                    out->buf[r*out->stride+c] = 0;
                 }
             }
         }
@@ -512,24 +569,33 @@ void getDiscontinuities(my_image_comp *image, Mat<int> offset, int height, int w
     }
 }
 
-void makeBoundaryDifferenceImage(my_image_comp *inLR_wavelet, my_image_comp *inHR_wavelet, my_image_comp *boundaryImage, Mat<int> offset, int waveletLevels, int commonWaveletLevels){
+void makeBoundaryDifferenceImage(my_image_comp *inLR_wavelet, my_image_comp *inHR_wavelet, my_image_comp *boundaryImage, Mat<int> offset, int waveletLevels, int commonWaveletLevels, int combineType){
     my_image_comp *boundary_wavelet = new my_image_comp;
     boundary_wavelet->init(inHR_wavelet->height, inHR_wavelet->width, HL_S97_HP*pow(2, waveletLevels)+HL_S97_LP);
 
     int LRspacing = (int)pow(2, waveletLevels);
     int commonSpacing = (int)pow(2, waveletLevels - commonWaveletLevels);
+    int scaleDiff = (int)pow(2, commonWaveletLevels);
 
     for(int r = 0; r < boundary_wavelet->height; r++){
         for(int c = 0; c < boundary_wavelet->width; c++){
-            if (inHR_wavelet->buf[r*inHR_wavelet->stride + c] == INVALID || inLR_wavelet->buf[(r+offset(1))*inLR_wavelet->stride + c+offset(0)] == INVALID){
+            if (inHR_wavelet->buf[r*inHR_wavelet->stride + c] == INVALID){
                 boundary_wavelet->buf[r*boundary_wavelet->stride + c] = INVALID;
             } else if(r % LRspacing == 0 && c % LRspacing == 0){
                 boundary_wavelet->buf[r*boundary_wavelet->stride + c] = 0;
             } else if(r % commonSpacing != 0 || c % commonSpacing != 0){
                 boundary_wavelet->buf[r*boundary_wavelet->stride + c] = 0;
             } else {
-                float err = inLR_wavelet->buf[(r+offset(1))*inLR_wavelet->stride + c+offset(0)] - inHR_wavelet->buf[r*inHR_wavelet->stride + c];
-                boundary_wavelet->buf[r*boundary_wavelet->stride + c] = (err/2.0)*(err/2.0);
+                float err = 0;
+                if(combineType <= MAX_VALUE_BLEND_LR){
+                    float maxVal = max(abs(inLR_wavelet->buf[((r+offset(1))/scaleDiff)*inLR_wavelet->stride + ((c+offset(0))/scaleDiff)]), abs(inHR_wavelet->buf[r*inHR_wavelet->stride + c]));
+                    if(maxVal == inHR_wavelet->buf[r*inHR_wavelet->stride + c] || -1*maxVal == inHR_wavelet->buf[r*inHR_wavelet->stride + c]){
+                        err = inLR_wavelet->buf[((r+offset(1))/scaleDiff)*inLR_wavelet->stride + ((c+offset(0))/scaleDiff)] - inHR_wavelet->buf[r*inHR_wavelet->stride + c];
+                    }
+                } else {
+                    err = inLR_wavelet->buf[((r+offset(1))/scaleDiff)*inLR_wavelet->stride + ((c+offset(0))/scaleDiff)] - inHR_wavelet->buf[r*inHR_wavelet->stride + c];
+                }
+                boundary_wavelet->buf[r*boundary_wavelet->stride + c] = (err/2.0);
             }
         }
     }
@@ -565,7 +631,7 @@ float getPixelCost(my_image_comp *boundaryImage, Mat<int> pixel, int boundaryWid
     float gradDiff = abs(normalGradient(0));
 
     return gradDiff + boundaryDistance/50.0;*/
-    return (1-lamda)*boundaryImage->buf[pixel(1)*boundaryImage->stride+pixel(0)] + lamda*boundaryDistance;
+    return (1-lamda)*abs(boundaryImage->buf[pixel(1)*boundaryImage->stride+pixel(0)]) + lamda*boundaryDistance;
 }
 
 int* makeArray(int value, int length){
@@ -582,12 +648,16 @@ float findBoundary(my_image_comp *boundaryImage, int** leftBoundary, int** right
     float totalCost = 0.0;
     (*leftBoundary) = findLeftBoundary(boundaryImage, boundaryWidth, &cost);
     totalCost += cost;
+    printf("TotalCost = %f\n", totalCost);
     (*rightBoundary) = findRightBoundary(boundaryImage, boundaryWidth, &cost);
     totalCost += cost;
+    printf("TotalCost = %f\n", totalCost);
     (*topBoundary) = findTopBoundary(boundaryImage, boundaryWidth, &cost);
     totalCost += cost;
+    printf("TotalCost = %f\n", totalCost);
     (*bottomBoundary) = findBottomBoundary(boundaryImage, boundaryWidth, &cost);
     totalCost += cost;
+    printf("TotalCost = %f\n", totalCost);
 
     //(*rightBoundary) = makeArray(boundaryImage->width-1, boundaryImage->height);
     //(*topBoundary) = makeArray(0, boundaryImage->width);
@@ -615,11 +685,19 @@ int* findLeftBoundary(my_image_comp *boundaryImage, int boundaryWidth, float* pa
 
     for(int r = 0; r < boundaryImage->height; r++){
         for(int c = 0; c < boundaryWidth; c++){
-            Mat<int> pixel(2,1);
-            pixel(0) = c + invalidOffset[r];
-            pixel(1) = r;
-            boundaryCost[r][c].cost = getPixelCost(boundaryImage, pixel, boundaryWidth, true);
-            if(r > 0){
+            if(invalidOffset[r] == boundaryImage->width){
+                boundaryCost[r][c].cost = 0;
+            } else {
+                Mat<int> pixel(2,1);
+                pixel(0) = c + invalidOffset[r];
+                pixel(1) = r;
+                if(pixel(0) >= boundaryImage->width){
+                    boundaryCost[r][c].cost = FLT_MAX;
+                } else {
+                    boundaryCost[r][c].cost = getPixelCost(boundaryImage, pixel, boundaryWidth, true);
+                }
+            }
+            if(r > 0 && boundaryCost[r][c].cost != FLT_MAX){
                 //find the minimum previous cost and add it to the current cost
                 float prevCost[3];
                 int i = 0;
@@ -701,11 +779,19 @@ int* findRightBoundary(my_image_comp *boundaryImage, int boundaryWidth, float* p
 
     for(int r = 0; r < boundaryImage->height; r++){
         for(int c = 0; c < boundaryWidth; c++){
-            Mat<int> pixel(2,1);
-            pixel(0) = c + invalidOffset[r] - boundaryWidth;
-            pixel(1) = r;
-            boundaryCost[r][c].cost = getPixelCost(boundaryImage, pixel, boundaryWidth, true);
-            if(r > 0){
+            if(invalidOffset[r] == -1){
+                boundaryCost[r][c].cost = 0;
+            } else {
+                Mat<int> pixel(2,1);
+                pixel(0) = c + invalidOffset[r] - boundaryWidth;
+                pixel(1) = r;
+                if(pixel(0) < 0){
+                    boundaryCost[r][c].cost = FLT_MAX;
+                } else {
+                    boundaryCost[r][c].cost = getPixelCost(boundaryImage, pixel, boundaryWidth, true);
+                }
+            }
+            if(r > 0 && boundaryCost[r][c].cost != FLT_MAX){
                 //find the minimum previous cost and add it to the current cost
                 float prevCost[3];
                 int i = 0;
@@ -787,11 +873,19 @@ int* findTopBoundary(my_image_comp *boundaryImage, int boundaryWidth, float* pat
 
     for(int c = 0; c < boundaryImage->width; c++){
         for(int r = 0; r < boundaryWidth; r++){
-            Mat<int> pixel(2,1);
-            pixel(0) = c;
-            pixel(1) = r + invalidOffset[c];
-            boundaryCost[c][r].cost = getPixelCost(boundaryImage, pixel, boundaryWidth, true);
-            if(c > 0){
+            if(invalidOffset[c] == boundaryImage->height){
+                boundaryCost[c][r].cost = 0;
+            } else {
+                Mat<int> pixel(2,1);
+                pixel(0) = c;
+                pixel(1) = r + invalidOffset[c];
+                if(pixel(1) >= boundaryImage->height){
+                    boundaryCost[c][r].cost = FLT_MAX;
+                } else {
+                    boundaryCost[c][r].cost = getPixelCost(boundaryImage, pixel, boundaryWidth, false);
+                }
+            }
+            if(c > 0 && boundaryCost[c][r].cost != FLT_MAX){
                 //find the minimum previous cost and add it to the current cost
                 float prevCost[3];
                 int i = 0;
@@ -873,11 +967,19 @@ int* findBottomBoundary(my_image_comp *boundaryImage, int boundaryWidth, float* 
 
     for(int c = 0; c < boundaryImage->width; c++){
         for(int r = 0; r < boundaryWidth; r++){
-            Mat<int> pixel(2,1);
-            pixel(0) = c;
-            pixel(1) = r + invalidOffset[c] - boundaryWidth;
-            boundaryCost[c][r].cost = getPixelCost(boundaryImage, pixel, boundaryWidth, true);
-            if(c > 0){
+            if(invalidOffset[c] == -1){
+                boundaryCost[c][r].cost = 0;
+            } else {
+                Mat<int> pixel(2,1);
+                pixel(0) = c;
+                pixel(1) = r + invalidOffset[c] - boundaryWidth;
+                if(pixel(1) < 0){
+                    boundaryCost[c][r].cost = FLT_MAX;
+                } else {
+                    boundaryCost[c][r].cost = getPixelCost(boundaryImage, pixel, boundaryWidth, false);
+                }
+            }
+            if(c > 0 && boundaryCost[c][r].cost != FLT_MAX){
                 //find the minimum previous cost and add it to the current cost
                 float prevCost[3];
                 int i = 0;
